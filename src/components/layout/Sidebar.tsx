@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const displayName = user?.name || profile.full_name;
   const displayAvatar = user?.picture || profile.avatar_url;
 
@@ -212,31 +212,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && <Icons.Settings size={14} color="#94A3B8" />}
         </div>
 
-        {/* User Snapshot Profile with Verified Status */}
+        {/* User Snapshot Profile with Verified Status & Logout */}
         <div
-          className={`flex items-center gap-3 px-1 py-1 ${isCollapsed ? 'justify-center' : ''}`}
-          title={`${displayName} (Google Verified)`}
+          className={`flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05] ${
+            isCollapsed ? 'justify-center' : 'justify-between'
+          }`}
         >
-          <div className="relative">
-            <img
-              src={displayAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-              alt={displayName}
-              className="w-9 h-9 rounded-xl object-cover border border-violet-500/40 shrink-0"
-            />
-            {user && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0E111D] rounded-full" />
+          <div
+            className={`flex items-center gap-2.5 overflow-hidden ${isCollapsed ? 'justify-center' : ''}`}
+            title={`${displayName} (${user?.email || 'Google Verified'})`}
+          >
+            <div className="relative shrink-0">
+              <img
+                src={displayAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                alt={displayName}
+                className="w-9 h-9 rounded-xl object-cover border border-violet-500/40 shrink-0"
+              />
+              {user && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0E111D] rounded-full" />
+              )}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                <p className="text-[10px] text-emerald-400 truncate font-semibold flex items-center gap-1">
+                  <span>✓</span>
+                  <span>Google Verified</span>
+                </p>
+              </div>
             )}
           </div>
+
           {!isCollapsed && (
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-white truncate">{displayName}</p>
-              <p className="text-[10px] text-emerald-400 truncate font-semibold flex items-center gap-1">
-                <span>✓</span>
-                <span>Google Verified</span>
-              </p>
-            </div>
+            <button
+              onClick={() => {
+                if (window.confirm('Apakah antum yakin ingin keluar dari akun ini?')) {
+                  logout();
+                }
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/15 border border-transparent hover:border-red-500/30 transition-all cursor-pointer shrink-0"
+              title="Keluar / Logout Akun"
+            >
+              <Icons.LogOut size={15} />
+            </button>
           )}
         </div>
+
+        {/* Collapsed Logout Icon Button */}
+        {isCollapsed && (
+          <button
+            onClick={() => {
+              if (window.confirm('Apakah antum yakin ingin keluar dari akun ini?')) {
+                logout();
+              }
+            }}
+            className="w-full py-2 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/15 border border-white/[0.06] hover:border-red-500/30 transition-all cursor-pointer"
+            title="Keluar / Logout Akun"
+          >
+            <Icons.LogOut size={16} />
+          </button>
+        )}
       </div>
     </aside>
   );

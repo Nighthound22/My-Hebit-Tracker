@@ -9,6 +9,7 @@ import { Icons } from '../ui/Icons';
 import { UserProfile } from '../../types';
 import { supabaseService, SupabaseConfig } from '../../lib/supabase';
 import { safeStorage } from '../../lib/storage';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateProfile,
   onResetAllData,
 }) => {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -453,6 +455,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-violet-500 font-mono"
               required
             />
+          </div>
+
+          {/* Sesi Akun Google & Tombol Logout */}
+          <div className="p-3.5 rounded-2xl bg-red-950/20 border border-red-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span>Akun Google Terhubung</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                  Aktif
+                </span>
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                {user?.email || 'achmadali220102@gmail.com'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Apakah antum yakin ingin keluar dari akun ini?')) {
+                  onClose();
+                  logout();
+                }
+              }}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white border border-red-500/40 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            >
+              <Icons.LogOut size={15} />
+              <span>Keluar (Logout)</span>
+            </button>
           </div>
 
           <div className="flex items-center justify-end pt-3 border-t border-white/[0.08]">

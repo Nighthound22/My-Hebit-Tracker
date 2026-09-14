@@ -23,7 +23,7 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
   quote,
   onOpenSettings,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [time, setTime] = useState<Date>(new Date());
   const [quoteAnim, setQuoteAnim] = useState(false);
 
@@ -33,6 +33,12 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleLogout = () => {
+    if (window.confirm('Apakah antum yakin ingin keluar dari akun ini?')) {
+      logout();
+    }
+  };
 
   const getGreeting = () => {
     const hour = time.getHours();
@@ -77,7 +83,7 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
         <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex items-center gap-4">
-          <div className="relative group">
+          <div className="relative group cursor-pointer" onClick={onOpenSettings} title="Klik untuk ubah foto & profil">
             <img
               src={user?.picture || profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
               alt={user?.name || profile.full_name}
@@ -109,8 +115,8 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
           </div>
         </div>
 
-        {/* Header Right Actions (Quote Insight & Settings) */}
-        <div className="relative z-10 flex items-center gap-3">
+        {/* Header Right Actions (Quote Insight, Settings, & Logout) */}
+        <div className="relative z-10 flex items-center gap-2.5">
           {/* Quote Insight Pill */}
           <div className="hidden lg:flex items-center gap-2 max-w-md bg-white/[0.03] hover:bg-white/[0.06] transition-colors px-3.5 py-2 rounded-xl border border-white/[0.06]">
             <span className="text-amber-400 shrink-0">
@@ -127,6 +133,15 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
             title="Pengaturan Profil & Database"
           >
             <Icons.Settings size={18} />
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 transition-all active:scale-95 shrink-0 cursor-pointer text-xs font-semibold shadow-sm"
+            title="Keluar / Logout Akun"
+          >
+            <Icons.LogOut size={16} />
+            <span className="hidden sm:inline">Keluar</span>
           </button>
         </div>
       </div>
