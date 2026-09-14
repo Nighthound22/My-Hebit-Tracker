@@ -33,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse,
 }) => {
+  const { user, logout } = useAuth();
   const displayName = profile.full_name || user?.name || 'Aura User';
   const displayAvatar =
     profile.avatar_url && !profile.avatar_url.includes('photo-1534528741775-53994a69daeb')
