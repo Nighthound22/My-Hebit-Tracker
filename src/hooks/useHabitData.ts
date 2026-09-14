@@ -3,9 +3,12 @@
 // Menghitung Otomatis Focus Score & Metrik Produktivitas PRD 3.1
 // ==============================================================================
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Habit, TaskItem, TimeBlock, FocusSession, QuickNote, UserProfile, DailyMetrics, TaskQuadrant } from '../types';
 import { LocalStorageService, getTodayKey } from '../lib/storage';
+import { supabaseService } from '../lib/supabase';
+import { supabaseSyncService, AppSyncData } from '../lib/supabaseSync';
+import { googleAuthService } from '../lib/auth';
 
 export const DAILY_QUOTES = [
   { text: "Kebiasaan kecil yang konsisten mengalahkan motivasi besar yang sesaat.", author: "James Clear (Atomic Habits)" },
@@ -24,6 +27,15 @@ export const useHabitData = () => {
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>(LocalStorageService.getFocusSessions);
   const [waterCups, setWaterCups] = useState<number>(LocalStorageService.getWaterCupsToday);
   const [notes, setNotes] = useState<QuickNote[]>(LocalStorageService.getQuickNotes);
+
+  // Status Sinkronisasi Cloud Supabase
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+  const isInitialPullDone = useRef<boolean>(false);
+  const isSyncingRef = useRef<boolean>(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Quote harian dinamis berdasarkan hari dalam tahun
   const dailyQuote = useMemo(() => {
@@ -60,6 +72,172 @@ export const useHabitData = () => {
   useEffect(() => {
     LocalStorageService.saveQuickNotes(notes);
   }, [notes]);
+
+  // Email aktif pengguna untuk partitioning data cloud
+  const getUserEmail = useCallback(() => {
+    const googleUser = googleAuthService.getUser();
+    if (googleUser?.email) return googleUser.email.trim().toLowerCase();
+    if (profile.email) return profile.email.trim().toLowerCase();
+    return 'achmadali220102@gmail.com';
+  }, [profile.email]);
+
+  // --- Mesin Tarik Cloud (Pull from Supabase) ---
+  const pullFromCloud = useCallback(async (isManual = false) => {
+    if (!supabaseService.isConfigured()) return false;
+    const email = getUserEmail();
+    if (!email) return false;
+
+    try {
+      setIsCloudSyncing(true);
+      setCloudSyncError(null);
+      const cloudData = await supabaseSyncService.pullData(email);
+
+      if (cloudData) {
+        // Tandai syncing agar tidak memicu debounced push otomatis saat local state diperbarui
+        isSyncingRef.current = true;
+
+        if (cloudData.profile) {
+          setProfile(prev => ({ ...prev, ...cloudData.profile }));
+          LocalStorageService.saveProfile({ ...profile, ...cloudData.profile });
+        }
+        if (Array.isArray(cloudData.habits)) {
+          setHabits(cloudData.habits);
+          LocalStorageService.saveHabits(cloudData.habits);
+        }
+        if (Array.isArray(cloudData.tasks)) {
+          setTasks(cloudData.tasks);
+          LocalStorageService.saveTasks(cloudData.tasks);
+        }
+        if (Array.isArray(cloudData.timeBlocks)) {
+          setTimeBlocks(cloudData.timeBlocks);
+          LocalStorageService.saveTimeBlocks(cloudData.timeBlocks);
+        }
+        if (Array.isArray(cloudData.focusSessions)) {
+          setFocusSessions(cloudData.focusSessions);
+          LocalStorageService.saveFocusSessions(cloudData.focusSessions);
+        }
+        if (typeof cloudData.waterCups === 'number') {
+          setWaterCups(cloudData.waterCups);
+          LocalStorageService.saveWaterCupsToday(cloudData.waterCups);
+        }
+        if (Array.isArray(cloudData.notes)) {
+          setNotes(cloudData.notes);
+          LocalStorageService.saveQuickNotes(cloudData.notes);
+        }
+
+        setLastSyncedAt(new Date(cloudData.updatedAt || Date.now()));
+
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 600);
+
+        return true;
+      } else if (isManual) {
+        // Jika manual pull dan di cloud belum ada baris untuk email ini, dorong data lokal saat ini
+        await pushToCloud();
+      }
+      return false;
+    } catch (err) {
+      console.warn('Pull cloud error:', err);
+      setCloudSyncError('Gagal sinkronisasi data dari cloud');
+      return false;
+    } finally {
+      setIsCloudSyncing(false);
+      isInitialPullDone.current = true;
+    }
+  }, [getUserEmail, profile]);
+
+  // --- Mesin Dorong Cloud (Push to Supabase) ---
+  const pushToCloud = useCallback(async () => {
+    if (!supabaseService.isConfigured()) return false;
+    const email = getUserEmail();
+    if (!email) return false;
+
+    try {
+      setIsCloudSyncing(true);
+      const payload: AppSyncData = {
+        profile,
+        habits,
+        tasks,
+        timeBlocks,
+        focusSessions,
+        waterCups,
+        notes,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const ok = await supabaseSyncService.pushData(email, payload);
+      if (ok) {
+        setLastSyncedAt(new Date());
+        setCloudSyncError(null);
+      } else {
+        setCloudSyncError('Gagal menyimpan ke Supabase');
+      }
+      return ok;
+    } catch (err) {
+      console.warn('Push cloud error:', err);
+      setCloudSyncError('Koneksi terputus saat menyimpan ke cloud');
+      return false;
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  }, [getUserEmail, profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes]);
+
+  // Sync saat pertama kali buka app, saat auth login berubah, dan saat tab browser aktif kembali (Laptop <-> HP)
+  useEffect(() => {
+    // Tarik data saat aplikasi pertama kali dibuka
+    pullFromCloud();
+
+    // Dengarkan perubahan login Google
+    const unsubscribe = googleAuthService.subscribe((user) => {
+      if (user?.email) {
+        pullFromCloud();
+      }
+    });
+
+    // Otomatis tarik data saat pengguna kembali membuka tab browser (Laptop <-> HP real-time feel)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        pullFromCloud();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [pullFromCloud]);
+
+  // Auto-push dengan Debounce (1.5 detik setelah user selesai input / ubah data)
+  useEffect(() => {
+    if (!isInitialPullDone.current) return;
+    if (isSyncingRef.current) return;
+    if (!supabaseService.isConfigured()) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      pushToCloud();
+    }, 1500);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes, pushToCloud]);
+
+  // Pemicu Sinkronisasi Manual (Bisa dipanggil dari Header / Tombol Sync)
+  const syncWithCloud = useCallback(async (forcePull = false) => {
+    if (forcePull) {
+      return await pullFromCloud(true);
+    } else {
+      return await pushToCloud();
+    }
+  }, [pullFromCloud, pushToCloud]);
 
   // --- Operasi Habit ---
   const toggleHabitDay = useCallback((habitId: string, dateStr: string) => {
@@ -277,6 +455,14 @@ export const useHabitData = () => {
     notes,
     dailyQuote,
     metrics,
+    // Cloud Sync State & Actions
+    isCloudSyncing,
+    cloudSyncError,
+    lastSyncedAt,
+    isSupabaseConfigured: supabaseService.isConfigured(),
+    syncWithCloud,
+    pushToCloud,
+    pullFromCloud,
     // Methods
     toggleHabitDay,
     addHabit,

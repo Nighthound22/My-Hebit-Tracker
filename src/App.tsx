@@ -104,9 +104,15 @@ export default function App() {
     addNote,
     deleteNote,
     resetAllData,
+    // Supabase Cloud Sync
+    isCloudSyncing,
+    cloudSyncError,
+    lastSyncedAt,
+    isSupabaseConfigured,
+    syncWithCloud,
   } = useHabitData();
 
-  const isCloudConnected = supabaseService.isConnected();
+  const isCloudConnected = isSupabaseConfigured;
 
   // Background Periodic Alarm & Notification Checker (Setiap 15 Detik)
   useEffect(() => {
@@ -208,6 +214,11 @@ export default function App() {
           metrics={metrics}
           quote={dailyQuote}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          isCloudSyncing={isCloudSyncing}
+          cloudSyncError={cloudSyncError}
+          lastSyncedAt={lastSyncedAt}
+          isSupabaseConfigured={isSupabaseConfigured}
+          onManualSync={() => syncWithCloud(false)}
         />
 
         {/* View Switcher based on Navigation Tab */}

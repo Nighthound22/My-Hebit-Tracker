@@ -192,23 +192,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        {/* Database Sync Status */}
+        {/* Cloud Sync Status Indicator */}
         <div
           onClick={onOpenSettings}
-          className={`flex items-center rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-colors cursor-pointer ${
-            isCollapsed ? 'justify-center p-2' : 'justify-between p-2.5'
+          className={`flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all cursor-pointer ${
+            isCollapsed ? 'justify-center' : ''
           }`}
-          title="Klik untuk konfigurasi Database & Profil"
+          title="Klik untuk konfigurasi Supabase Cloud & Sinkronisasi HP"
         >
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                isCloudConnected ? 'bg-emerald-400 shadow-[0_0_8px_#10B981]' : 'bg-cyan-400 shadow-[0_0_8px_#06B6D4]'
+                isCloudConnected ? 'bg-emerald-400 shadow-[0_0_8px_#10B981]' : 'bg-amber-400 shadow-[0_0_8px_#F59E0B]'
               }`}
             />
             {!isCollapsed && (
               <span className="text-xs text-slate-300">
-                {isCloudConnected ? 'Neon Sync' : 'Offline Mode'}
+                {isCloudConnected ? 'Supabase Sync' : 'Local Mode'}
               </span>
             )}
           </div>

@@ -15,6 +15,11 @@ interface HeaderOverviewProps {
   quote: { text: string; author: string };
   onOpenSettings: () => void;
   onOpenCommandPalette?: () => void;
+  isCloudSyncing?: boolean;
+  cloudSyncError?: string | null;
+  lastSyncedAt?: Date | null;
+  isSupabaseConfigured?: boolean;
+  onManualSync?: () => void;
 }
 
 export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
@@ -22,6 +27,11 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
   metrics,
   quote,
   onOpenSettings,
+  isCloudSyncing = false,
+  cloudSyncError = null,
+  lastSyncedAt = null,
+  isSupabaseConfigured = false,
+  onManualSync,
 }) => {
   const { user, logout } = useAuth();
   const [time, setTime] = useState<Date>(new Date());
@@ -132,6 +142,38 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
               "{quote.text}"
             </p>
           </div>
+
+          {/* Cloud Sync Status & Manual Sync Button */}
+          <button
+            onClick={isSupabaseConfigured ? onManualSync : onOpenSettings}
+            disabled={isCloudSyncing}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer active:scale-95 shadow-sm ${
+              isCloudSyncing
+                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300 animate-pulse'
+                : cloudSyncError
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+                : isSupabaseConfigured
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25 text-emerald-400'
+                : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/10 text-slate-400'
+            }`}
+            title={
+              cloudSyncError
+                ? `Sync Gagal: ${cloudSyncError}. Klik untuk coba lagi`
+                : isSupabaseConfigured
+                ? `Supabase Cloud Aktif (${lastSyncedAt ? 'Terakhir: ' + lastSyncedAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Siap'}). Klik untuk Sinkronkan sekarang`
+                : 'Supabase Cloud belum aktif. Klik untuk setup sinkronisasi HP-Laptop'
+            }
+          >
+            <span className={isCloudSyncing ? 'animate-spin text-cyan-400' : isSupabaseConfigured ? 'text-emerald-400' : 'text-slate-400'}>
+              {isCloudSyncing ? <Icons.RefreshCw size={15} /> : <Icons.Cloud size={15} />}
+            </span>
+            <span className="hidden sm:inline font-mono text-[11px]">
+              {isCloudSyncing ? 'Syncing...' : cloudSyncError ? 'Coba Sync' : isSupabaseConfigured ? 'Cloud Sync' : 'Offline'}
+            </span>
+            {isSupabaseConfigured && !isCloudSyncing && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
 
           <button
             onClick={onOpenSettings}

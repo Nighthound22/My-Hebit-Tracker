@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { Icons } from '../ui/Icons';
 import { UserProfile } from '../../types';
 import { supabaseService, SupabaseConfig } from '../../lib/supabase';
+import { supabaseSyncService } from '../../lib/supabaseSync';
 import { safeStorage } from '../../lib/storage';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -25,6 +26,21 @@ interface NeonConfig {
   isEnabled: boolean;
 }
 
+const SYNC_SQL_SCHEMA = `-- Jalankan query ini di SQL Editor Supabase untuk sinkronisasi Laptop & HP
+CREATE TABLE IF NOT EXISTS public.user_sync_data (
+  email TEXT PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.user_sync_data ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Full Access" ON public.user_sync_data;
+CREATE POLICY "Public Full Access" ON public.user_sync_data
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);`;
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -33,9 +49,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetAllData,
 }) => {
   const { user, updateUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
+  const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('supabase');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // States untuk Test Koneksi & Pairing HP
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [supabaseTestResult, setSupabaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [copiedPairingLink, setCopiedPairingLink] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
   
   // Neon Config
   const [neonConfig, setNeonConfig] = useState<NeonConfig>(() => {
@@ -99,8 +121,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSaveSupabase = (e: React.FormEvent) => {
     e.preventDefault();
     supabaseService.saveConfig(supabaseConfig);
-    setSaveMessage('Koneksi Supabase berhasil disimpan!');
+    setSaveMessage('✓ Konfigurasi Supabase berhasil disimpan!');
     setTimeout(() => setSaveMessage(null), 3000);
+  };
+
+  const handleTestSupabase = async () => {
+    setIsTestingSupabase(true);
+    setSupabaseTestResult(null);
+    try {
+      const res = await supabaseSyncService.testConnection(supabaseConfig);
+      setSupabaseTestResult(res);
+    } catch {
+      setSupabaseTestResult({ success: false, message: 'Gagal menghubungi server Supabase.' });
+    } finally {
+      setIsTestingSupabase(false);
+    }
+  };
+
+  const handleCopyPairing = () => {
+    const link = supabaseService.getShareableSyncLink(supabaseConfig);
+    navigator.clipboard.writeText(link);
+    setCopiedPairingLink(true);
+    setTimeout(() => setCopiedPairingLink(false), 3000);
+  };
+
+  const handleCopySqlCode = () => {
+    navigator.clipboard.writeText(SYNC_SQL_SCHEMA);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -285,73 +333,160 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       {/* 2. Supabase Tab */}
       {activeTab === 'supabase' && (
-        <form onSubmit={handleSaveSupabase} className="space-y-4">
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-white/[0.06] flex items-start gap-3">
-            <div
-              className={`p-2 rounded-lg mt-0.5 ${
-                status.status === 'cloud'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-cyan-500/20 text-cyan-400'
-              }`}
-            >
-              <Icons.Cloud size={18} />
+        <div className="space-y-4">
+          <form onSubmit={handleSaveSupabase} className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/[0.06] flex items-start gap-3">
+              <div
+                className={`p-2 rounded-lg mt-0.5 ${
+                  status.status === 'cloud'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-cyan-500/20 text-cyan-400'
+                }`}
+              >
+                <Icons.Cloud size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">{status.text}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{status.details}</p>
+              </div>
             </div>
+
             <div>
-              <p className="text-xs font-bold text-white">{status.text}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{status.details}</p>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Supabase Project URL
+              </label>
+              <input
+                type="url"
+                value={supabaseConfig.url}
+                onChange={e => setSupabaseConfig({ ...supabaseConfig, url: e.target.value })}
+                placeholder="https://xyzcompany.supabase.co"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Supabase Anon Key (Public Key)
+              </label>
+              <input
+                type="password"
+                value={supabaseConfig.anonKey}
+                onChange={e => setSupabaseConfig({ ...supabaseConfig, anonKey: e.target.value })}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="enableSync"
+                checked={supabaseConfig.isEnabled}
+                onChange={e => setSupabaseConfig({ ...supabaseConfig, isEnabled: e.target.checked })}
+                className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
+              />
+              <label htmlFor="enableSync" className="text-xs text-slate-300 cursor-pointer font-medium">
+                Aktifkan sinkronisasi cloud real-time ke Supabase (Laptop & HP)
+              </label>
+            </div>
+
+            {/* Test Connection Result Alert */}
+            {supabaseTestResult && (
+              <div
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                  supabaseTestResult.success
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : 'bg-red-500/15 border-red-500/30 text-red-300'
+                }`}
+              >
+                {supabaseTestResult.success ? <Icons.CheckCircle2 size={16} /> : <Icons.ShieldAlert size={16} />}
+                <span>{supabaseTestResult.message}</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-white/[0.08]">
+              <button
+                type="button"
+                onClick={handleTestSupabase}
+                disabled={isTestingSupabase}
+                className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 border border-cyan-500/20 transition-all text-xs font-semibold cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Icons.RefreshCw size={14} className={isTestingSupabase ? 'animate-spin' : ''} />
+                <span>{isTestingSupabase ? 'Memeriksa...' : '⚡ Uji Koneksi & Tabel'}</span>
+              </button>
+              <Button type="submit" variant="aura" size="sm">
+                Simpan Konfigurasi
+              </Button>
+            </div>
+          </form>
+
+          {/* 1-Click Mobile Pairing Feature */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-950/40 via-slate-900/80 to-cyan-950/40 border border-violet-500/30 space-y-2.5">
+            <div className="flex items-center gap-2 text-violet-300 font-bold text-xs">
+              <span className="text-base">📱</span>
+              <span>Hubungkan ke HP (1-Klik Tanpa Ketik Key)</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Tidak perlu repot mengetik Project URL dan Anon Key yang panjang di layar HP! Cukup salin tautan pintar ini lalu buka di browser smartphone (misal kirim ke pesan WhatsApp antum).
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleCopyPairing}
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border shadow-lg ${
+                  copiedPairingLink
+                    ? 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/30'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white border-violet-400/40 shadow-violet-600/30 active:scale-[0.98]'
+                }`}
+              >
+                {copiedPairingLink ? (
+                  <>
+                    <Icons.Check size={16} />
+                    <span>✓ Tautan Berhasil Disalin! Buka di HP Antum</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📱</span>
+                    <span>Salin Tautan Pairing ke HP</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Supabase Project URL
-            </label>
-            <input
-              type="url"
-              value={supabaseConfig.url}
-              onChange={e => setSupabaseConfig({ ...supabaseConfig, url: e.target.value })}
-              placeholder="https://xyzcompany.supabase.co"
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-            />
+          {/* SQL Schema Copy Box */}
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/[0.08] space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-white">
+                <Icons.Database size={15} className="text-cyan-400" />
+                <span>Skema SQL Sinkronisasi (`user_sync_data`)</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopySqlCode}
+                className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+              >
+                {copiedSql ? (
+                  <>
+                    <Icons.Check size={12} />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📋</span>
+                    <span>Salin SQL</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Jalankan perintah SQL ini di menu <strong>SQL Editor</strong> Supabase antum satu kali untuk mengaktifkan sinkronisasi otomatis Laptop & HP:
+            </p>
+            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-cyan-300 overflow-x-auto select-all leading-normal">
+              {SYNC_SQL_SCHEMA}
+            </pre>
           </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Supabase Anon Key (Public Key)
-            </label>
-            <input
-              type="password"
-              value={supabaseConfig.anonKey}
-              onChange={e => setSupabaseConfig({ ...supabaseConfig, anonKey: e.target.value })}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="enableSync"
-              checked={supabaseConfig.isEnabled}
-              onChange={e => setSupabaseConfig({ ...supabaseConfig, isEnabled: e.target.checked })}
-              className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
-            />
-            <label htmlFor="enableSync" className="text-xs text-slate-300 cursor-pointer font-medium">
-              Aktifkan sinkronisasi cloud real-time ke Supabase
-            </label>
-          </div>
-
-          <div className="p-3 bg-violet-950/20 border border-violet-500/20 rounded-xl text-[11px] text-slate-300">
-            💡 Skema SQL database Supabase sudah tersedia di berkas{' '}
-            <code className="text-cyan-400 font-mono">supabase/schema.sql</code>.
-          </div>
-
-          <div className="flex items-center justify-end pt-3 border-t border-white/[0.08]">
-            <Button type="submit" variant="aura" size="sm">
-              Simpan Konfigurasi Supabase
-            </Button>
-          </div>
-        </form>
+        </div>
       )}
 
       {/* 3. Profil Tab */}
