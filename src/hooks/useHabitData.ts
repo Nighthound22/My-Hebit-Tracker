@@ -35,8 +35,33 @@ export const useHabitData = () => {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   const isInitialPullDone = useRef<boolean>(false);
-  const isSyncingRef = useRef<boolean>(false);
+  const isPullingRef = useRef<boolean>(false);
+  const lastSyncedFingerprintRef = useRef<string>('');
+  const lastPullTimeRef = useRef<number>(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Simpan state terkini dalam ref agar pushToCloud tidak perlu re-create setiap kali state berubah
+  const stateRef = useRef({
+    profile,
+    habits,
+    tasks,
+    timeBlocks,
+    focusSessions,
+    waterCups,
+    notes,
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      profile,
+      habits,
+      tasks,
+      timeBlocks,
+      focusSessions,
+      waterCups,
+      notes,
+    };
+  }, [profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes]);
 
   // Quote harian dinamis berdasarkan hari dalam tahun
   const dailyQuote = useMemo(() => {
@@ -82,13 +107,38 @@ export const useHabitData = () => {
     return 'achmadali220102@gmail.com';
   }, [profile.email]);
 
-  // Penerapan data dari cloud ke local state & storage cache
+  // Komputasi sidik jari (fingerprint) data untuk mencegah push/pull berulang jika data identik
+  const computeFingerprint = useCallback((data: {
+    profile: UserProfile;
+    habits: Habit[];
+    tasks: TaskItem[];
+    timeBlocks: TimeBlock[];
+    focusSessions: FocusSession[];
+    waterCups: number;
+    notes: QuickNote[];
+  }) => {
+    try {
+      return JSON.stringify({
+        p: { n: data.profile?.full_name, a: data.profile?.avatar_url, w: data.profile?.daily_water_target },
+        h: (data.habits || []).map(h => ({ id: h.id, l: h.logs, s: h.currentStreak })),
+        t: (data.tasks || []).map(t => ({ id: t.id, c: t.is_completed, q: t.priority_quadrant })),
+        tb: (data.timeBlocks || []).map(b => ({ id: b.id, s: b.start_time, e: b.end_time })),
+        fs: (data.focusSessions || []).length,
+        wc: data.waterCups,
+        n: (data.notes || []).map(n => ({ id: n.id, c: n.content })),
+      });
+    } catch {
+      return '';
+    }
+  }, []);
+
+  // Penerapan data dari cloud ke local state & storage cache secara aman
   const applyCloudData = useCallback((cloudData: AppSyncData) => {
-    isSyncingRef.current = true;
+    isPullingRef.current = true;
 
     if (cloudData.profile) {
       setProfile(prev => ({ ...prev, ...cloudData.profile }));
-      LocalStorageService.saveProfile({ ...profile, ...cloudData.profile });
+      LocalStorageService.saveProfile(cloudData.profile);
     }
     if (Array.isArray(cloudData.habits)) {
       setHabits(cloudData.habits);
@@ -117,10 +167,21 @@ export const useHabitData = () => {
 
     setLastSyncedAt(new Date(cloudData.updatedAt || Date.now()));
 
+    // Catat sidik jari data cloud agar sistem TIDAK memicu push ulang data yang baru saja ditarik
+    lastSyncedFingerprintRef.current = computeFingerprint({
+      profile: cloudData.profile || stateRef.current.profile,
+      habits: cloudData.habits || stateRef.current.habits,
+      tasks: cloudData.tasks || stateRef.current.tasks,
+      timeBlocks: cloudData.timeBlocks || stateRef.current.timeBlocks,
+      focusSessions: cloudData.focusSessions || stateRef.current.focusSessions,
+      waterCups: typeof cloudData.waterCups === 'number' ? cloudData.waterCups : stateRef.current.waterCups,
+      notes: cloudData.notes || stateRef.current.notes,
+    });
+
     setTimeout(() => {
-      isSyncingRef.current = false;
-    }, 600);
-  }, [profile]);
+      isPullingRef.current = false;
+    }, 1200);
+  }, [computeFingerprint]);
 
   // --- Mesin Dorong Cloud (Push ke Neon Console atau Supabase) ---
   const pushToCloud = useCallback(async () => {
@@ -131,16 +192,25 @@ export const useHabitData = () => {
     const email = getUserEmail();
     if (!email) return false;
 
+    // Ambil snapshot data terkini dari stateRef
+    const currentData = stateRef.current;
+    const currentFp = computeFingerprint(currentData);
+
+    // Jika data tidak berubah sama sekali dari yang terakhir tersimpan di cloud, abaikan
+    if (currentFp && currentFp === lastSyncedFingerprintRef.current) {
+      return true;
+    }
+
     try {
       setIsCloudSyncing(true);
       const payload: AppSyncData = {
-        profile,
-        habits,
-        tasks,
-        timeBlocks,
-        focusSessions,
-        waterCups,
-        notes,
+        profile: currentData.profile,
+        habits: currentData.habits,
+        tasks: currentData.tasks,
+        timeBlocks: currentData.timeBlocks,
+        focusSessions: currentData.focusSessions,
+        waterCups: currentData.waterCups,
+        notes: currentData.notes,
         updatedAt: new Date().toISOString(),
       };
 
@@ -154,6 +224,7 @@ export const useHabitData = () => {
       }
 
       if (ok) {
+        lastSyncedFingerprintRef.current = currentFp;
         setLastSyncedAt(new Date());
         setCloudSyncError(null);
       } else {
@@ -167,7 +238,7 @@ export const useHabitData = () => {
     } finally {
       setIsCloudSyncing(false);
     }
-  }, [getUserEmail, profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes]);
+  }, [getUserEmail, computeFingerprint]);
 
   // --- Mesin Tarik Cloud (Pull dari Neon Console atau Supabase) ---
   const pullFromCloud = useCallback(async (isManual = false) => {
@@ -177,6 +248,13 @@ export const useHabitData = () => {
 
     const email = getUserEmail();
     if (!email) return false;
+
+    // Cooldown 6 detik untuk pull otomatis agar tidak membanjiri request berulang
+    const now = Date.now();
+    if (!isManual && now - lastPullTimeRef.current < 6000) {
+      return false;
+    }
+    lastPullTimeRef.current = now;
 
     try {
       setIsCloudSyncing(true);
@@ -193,7 +271,7 @@ export const useHabitData = () => {
         applyCloudData(cloudData);
         return true;
       } else if (isManual) {
-        // Jika manual pull dan di cloud belum ada baris untuk email ini, dorong data lokal saat ini
+        // Jika manual sync dan di cloud belum ada data untuk email ini, unggah data awal
         await pushToCloud();
       }
       return false;
@@ -209,20 +287,17 @@ export const useHabitData = () => {
 
   // Sync saat pertama kali buka app, saat auth login berubah, dan saat tab browser aktif kembali (Laptop <-> HP)
   useEffect(() => {
-    // Tarik data saat aplikasi pertama kali dibuka
     pullFromCloud();
 
-    // Dengarkan perubahan login Google
     const unsubscribe = googleAuthService.subscribe((user) => {
       if (user?.email) {
-        pullFromCloud();
+        pullFromCloud(true);
       }
     });
 
-    // Otomatis tarik data saat pengguna kembali membuka tab browser (Laptop <-> HP real-time feel)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        pullFromCloud();
+        pullFromCloud(false);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -233,11 +308,26 @@ export const useHabitData = () => {
     };
   }, [pullFromCloud]);
 
-  // Auto-push dengan Debounce (1.5 detik setelah user selesai input / ubah data)
+  // Auto-push dengan Debounce (1.5 detik) HANYA jika ada perubahan nyata dari pengguna
   useEffect(() => {
     if (!isInitialPullDone.current) return;
-    if (isSyncingRef.current) return;
+    if (isPullingRef.current) return;
     if (!neonSyncService.isConfigured() && !supabaseService.isConfigured()) return;
+
+    const currentFp = computeFingerprint({
+      profile,
+      habits,
+      tasks,
+      timeBlocks,
+      focusSessions,
+      waterCups,
+      notes,
+    });
+
+    // Jika sidik jari identik dengan yang ada di cloud (misal baru ditarik), jangan push!
+    if (currentFp && currentFp === lastSyncedFingerprintRef.current) {
+      return;
+    }
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -252,7 +342,7 @@ export const useHabitData = () => {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes, pushToCloud]);
+  }, [profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes, computeFingerprint, pushToCloud]);
 
   // Pemicu Sinkronisasi Manual (Bisa dipanggil dari Header / Tombol Sync)
   const syncWithCloud = useCallback(async (forcePull = false) => {
