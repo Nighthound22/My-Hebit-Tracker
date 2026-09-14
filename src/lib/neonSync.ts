@@ -75,6 +75,10 @@ export class NeonSyncService {
     return Boolean(this.config.isEnabled && this.config.connectionString);
   }
 
+  public isConnected(): boolean {
+    return this.isConfigured();
+  }
+
   // Deteksi auto-pairing dari tautan pintar (?neon_conn=...)
   private checkUrlForAutoPairing(): void {
     if (typeof window === 'undefined') return;

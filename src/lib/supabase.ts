@@ -76,6 +76,10 @@ class SupabaseService {
     return !!(this.config?.isEnabled && this.config?.url && this.config?.anonKey);
   };
 
+  public isConfigured = (): boolean => {
+    return this.isConnected();
+  };
+
   public getShareableSyncLink = (): string => {
     if (!this.config.url || !this.config.anonKey) return '';
     const base = typeof window !== 'undefined' ? window.location.origin : 'https://my-hebit-tracker.vercel.app';
