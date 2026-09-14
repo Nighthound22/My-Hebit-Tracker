@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Habit, TaskItem, TimeBlock, FocusSession, QuickNote, UserProfile, DailyMetrics, TaskQuadrant } from '../types';
 import { LocalStorageService, getTodayKey } from '../lib/storage';
+import { neonSyncService } from '../lib/neonSync';
 import { supabaseService } from '../lib/supabase';
 import { supabaseSyncService, AppSyncData } from '../lib/supabaseSync';
 import { googleAuthService } from '../lib/auth';
@@ -81,75 +82,52 @@ export const useHabitData = () => {
     return 'achmadali220102@gmail.com';
   }, [profile.email]);
 
-  // --- Mesin Tarik Cloud (Pull from Supabase) ---
-  const pullFromCloud = useCallback(async (isManual = false) => {
-    if (!supabaseService.isConfigured()) return false;
-    const email = getUserEmail();
-    if (!email) return false;
+  // Penerapan data dari cloud ke local state & storage cache
+  const applyCloudData = useCallback((cloudData: AppSyncData) => {
+    isSyncingRef.current = true;
 
-    try {
-      setIsCloudSyncing(true);
-      setCloudSyncError(null);
-      const cloudData = await supabaseSyncService.pullData(email);
-
-      if (cloudData) {
-        // Tandai syncing agar tidak memicu debounced push otomatis saat local state diperbarui
-        isSyncingRef.current = true;
-
-        if (cloudData.profile) {
-          setProfile(prev => ({ ...prev, ...cloudData.profile }));
-          LocalStorageService.saveProfile({ ...profile, ...cloudData.profile });
-        }
-        if (Array.isArray(cloudData.habits)) {
-          setHabits(cloudData.habits);
-          LocalStorageService.saveHabits(cloudData.habits);
-        }
-        if (Array.isArray(cloudData.tasks)) {
-          setTasks(cloudData.tasks);
-          LocalStorageService.saveTasks(cloudData.tasks);
-        }
-        if (Array.isArray(cloudData.timeBlocks)) {
-          setTimeBlocks(cloudData.timeBlocks);
-          LocalStorageService.saveTimeBlocks(cloudData.timeBlocks);
-        }
-        if (Array.isArray(cloudData.focusSessions)) {
-          setFocusSessions(cloudData.focusSessions);
-          LocalStorageService.saveFocusSessions(cloudData.focusSessions);
-        }
-        if (typeof cloudData.waterCups === 'number') {
-          setWaterCups(cloudData.waterCups);
-          LocalStorageService.saveWaterCupsToday(cloudData.waterCups);
-        }
-        if (Array.isArray(cloudData.notes)) {
-          setNotes(cloudData.notes);
-          LocalStorageService.saveQuickNotes(cloudData.notes);
-        }
-
-        setLastSyncedAt(new Date(cloudData.updatedAt || Date.now()));
-
-        setTimeout(() => {
-          isSyncingRef.current = false;
-        }, 600);
-
-        return true;
-      } else if (isManual) {
-        // Jika manual pull dan di cloud belum ada baris untuk email ini, dorong data lokal saat ini
-        await pushToCloud();
-      }
-      return false;
-    } catch (err) {
-      console.warn('Pull cloud error:', err);
-      setCloudSyncError('Gagal sinkronisasi data dari cloud');
-      return false;
-    } finally {
-      setIsCloudSyncing(false);
-      isInitialPullDone.current = true;
+    if (cloudData.profile) {
+      setProfile(prev => ({ ...prev, ...cloudData.profile }));
+      LocalStorageService.saveProfile({ ...profile, ...cloudData.profile });
     }
-  }, [getUserEmail, profile]);
+    if (Array.isArray(cloudData.habits)) {
+      setHabits(cloudData.habits);
+      LocalStorageService.saveHabits(cloudData.habits);
+    }
+    if (Array.isArray(cloudData.tasks)) {
+      setTasks(cloudData.tasks);
+      LocalStorageService.saveTasks(cloudData.tasks);
+    }
+    if (Array.isArray(cloudData.timeBlocks)) {
+      setTimeBlocks(cloudData.timeBlocks);
+      LocalStorageService.saveTimeBlocks(cloudData.timeBlocks);
+    }
+    if (Array.isArray(cloudData.focusSessions)) {
+      setFocusSessions(cloudData.focusSessions);
+      LocalStorageService.saveFocusSessions(cloudData.focusSessions);
+    }
+    if (typeof cloudData.waterCups === 'number') {
+      setWaterCups(cloudData.waterCups);
+      LocalStorageService.saveWaterCupsToday(cloudData.waterCups);
+    }
+    if (Array.isArray(cloudData.notes)) {
+      setNotes(cloudData.notes);
+      LocalStorageService.saveQuickNotes(cloudData.notes);
+    }
 
-  // --- Mesin Dorong Cloud (Push to Supabase) ---
+    setLastSyncedAt(new Date(cloudData.updatedAt || Date.now()));
+
+    setTimeout(() => {
+      isSyncingRef.current = false;
+    }, 600);
+  }, [profile]);
+
+  // --- Mesin Dorong Cloud (Push ke Neon Console atau Supabase) ---
   const pushToCloud = useCallback(async () => {
-    if (!supabaseService.isConfigured()) return false;
+    const isNeon = neonSyncService.isConfigured();
+    const isSupabase = supabaseService.isConfigured();
+    if (!isNeon && !isSupabase) return false;
+
     const email = getUserEmail();
     if (!email) return false;
 
@@ -166,12 +144,20 @@ export const useHabitData = () => {
         updatedAt: new Date().toISOString(),
       };
 
-      const ok = await supabaseSyncService.pushData(email, payload);
+      let ok = false;
+      const targetName = isNeon ? 'Neon Console' : 'Supabase';
+
+      if (isNeon) {
+        ok = await neonSyncService.pushData(email, payload);
+      } else if (isSupabase) {
+        ok = await supabaseSyncService.pushData(email, payload);
+      }
+
       if (ok) {
         setLastSyncedAt(new Date());
         setCloudSyncError(null);
       } else {
-        setCloudSyncError('Gagal menyimpan ke Supabase');
+        setCloudSyncError(`Gagal menyimpan ke ${targetName}`);
       }
       return ok;
     } catch (err) {
@@ -182,6 +168,44 @@ export const useHabitData = () => {
       setIsCloudSyncing(false);
     }
   }, [getUserEmail, profile, habits, tasks, timeBlocks, focusSessions, waterCups, notes]);
+
+  // --- Mesin Tarik Cloud (Pull dari Neon Console atau Supabase) ---
+  const pullFromCloud = useCallback(async (isManual = false) => {
+    const isNeon = neonSyncService.isConfigured();
+    const isSupabase = supabaseService.isConfigured();
+    if (!isNeon && !isSupabase) return false;
+
+    const email = getUserEmail();
+    if (!email) return false;
+
+    try {
+      setIsCloudSyncing(true);
+      setCloudSyncError(null);
+
+      let cloudData: AppSyncData | null = null;
+      if (isNeon) {
+        cloudData = await neonSyncService.pullData(email);
+      } else if (isSupabase) {
+        cloudData = await supabaseSyncService.pullData(email);
+      }
+
+      if (cloudData) {
+        applyCloudData(cloudData);
+        return true;
+      } else if (isManual) {
+        // Jika manual pull dan di cloud belum ada baris untuk email ini, dorong data lokal saat ini
+        await pushToCloud();
+      }
+      return false;
+    } catch (err) {
+      console.warn('Pull cloud error:', err);
+      setCloudSyncError('Gagal sinkronisasi data dari cloud');
+      return false;
+    } finally {
+      setIsCloudSyncing(false);
+      isInitialPullDone.current = true;
+    }
+  }, [getUserEmail, applyCloudData, pushToCloud]);
 
   // Sync saat pertama kali buka app, saat auth login berubah, dan saat tab browser aktif kembali (Laptop <-> HP)
   useEffect(() => {
@@ -213,7 +237,7 @@ export const useHabitData = () => {
   useEffect(() => {
     if (!isInitialPullDone.current) return;
     if (isSyncingRef.current) return;
-    if (!supabaseService.isConfigured()) return;
+    if (!neonSyncService.isConfigured() && !supabaseService.isConfigured()) return;
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -459,7 +483,10 @@ export const useHabitData = () => {
     isCloudSyncing,
     cloudSyncError,
     lastSyncedAt,
+    isCloudConfigured: neonSyncService.isConfigured() || supabaseService.isConfigured(),
+    cloudProvider: neonSyncService.isConfigured() ? 'neon' : (supabaseService.isConfigured() ? 'supabase' : 'offline'),
     isSupabaseConfigured: supabaseService.isConfigured(),
+    isNeonConfigured: neonSyncService.isConfigured(),
     syncWithCloud,
     pushToCloud,
     pullFromCloud,

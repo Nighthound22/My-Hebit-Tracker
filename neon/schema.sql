@@ -90,3 +90,10 @@ CREATE INDEX IF NOT EXISTS idx_neon_habit_logs_date ON public.habit_logs(complet
 CREATE INDEX IF NOT EXISTS idx_neon_tasks_quadrant ON public.tasks(user_id, priority_quadrant, is_completed);
 CREATE INDEX IF NOT EXISTS idx_neon_focus_sessions_user ON public.focus_sessions(user_id, completed_at);
 CREATE INDEX IF NOT EXISTS idx_neon_time_blocks_user ON public.time_blocks(user_id);
+
+-- 9. Table User Sync Data (Sinkronisasi Multi-Perangkat Laptop & HP)
+CREATE TABLE IF NOT EXISTS public.user_sync_data (
+  email TEXT PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

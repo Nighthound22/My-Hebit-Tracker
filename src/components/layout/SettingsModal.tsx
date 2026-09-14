@@ -9,6 +9,7 @@ import { Icons } from '../ui/Icons';
 import { UserProfile } from '../../types';
 import { supabaseService, SupabaseConfig } from '../../lib/supabase';
 import { supabaseSyncService } from '../../lib/supabaseSync';
+import { neonSyncService, NeonConfig } from '../../lib/neonSync';
 import { safeStorage } from '../../lib/storage';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -20,11 +21,12 @@ interface SettingsModalProps {
   onResetAllData: () => void;
 }
 
-interface NeonConfig {
-  connectionString: string;
-  projectId: string;
-  isEnabled: boolean;
-}
+const NEON_SQL_SCHEMA = `-- Jalankan query ini di SQL Editor Neon Console (proud-base-70292180)
+CREATE TABLE IF NOT EXISTS public.user_sync_data (
+  email TEXT PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);`;
 
 const SYNC_SQL_SCHEMA = `-- Jalankan query ini di SQL Editor Supabase untuk sinkronisasi Laptop & HP
 CREATE TABLE IF NOT EXISTS public.user_sync_data (
@@ -49,37 +51,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetAllData,
 }) => {
   const { user, updateUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('supabase');
+  const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
+  const [neonConfig, setNeonConfig] = useState<NeonConfig>(() => neonSyncService.loadConfig());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // States untuk Test Koneksi & Pairing HP
+  // States untuk Test Koneksi & Pairing HP (Neon & Supabase)
+  const [isTestingNeon, setIsTestingNeon] = useState(false);
+  const [neonTestResult, setNeonTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [copiedNeonPairingLink, setCopiedNeonPairingLink] = useState(false);
+  const [copiedNeonSql, setCopiedNeonSql] = useState(false);
+
   const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const [supabaseTestResult, setSupabaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedPairingLink, setCopiedPairingLink] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   
-  // Neon Config
-  const [neonConfig, setNeonConfig] = useState<NeonConfig>(() => {
-    const raw = safeStorage.getItem('aura_neon_config_v1');
-    if (!raw) {
-      return {
-        connectionString: '',
-        projectId: 'proud-base-70292180',
-        isEnabled: false,
-      };
-    }
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return {
-        connectionString: '',
-        projectId: 'proud-base-70292180',
-        isEnabled: false,
-      };
-    }
-  });
-
   const [fullName, setFullName] = useState(profile.full_name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [waterTarget, setWaterTarget] = useState(profile.daily_water_target);
@@ -113,9 +100,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSaveNeon = (e: React.FormEvent) => {
     e.preventDefault();
-    safeStorage.setItem('aura_neon_config_v1', JSON.stringify(neonConfig));
-    setSaveMessage('Konfigurasi Neon PostgreSQL berhasil disimpan!');
+    neonSyncService.saveConfig(neonConfig);
+    setSaveMessage('✓ Konfigurasi Neon Console (proud-base-70292180) berhasil disimpan!');
     setTimeout(() => setSaveMessage(null), 3000);
+  };
+
+  const handleTestNeon = async () => {
+    setIsTestingNeon(true);
+    setNeonTestResult(null);
+    try {
+      const res = await neonSyncService.testConnection(neonConfig);
+      setNeonTestResult(res);
+    } catch {
+      setNeonTestResult({ success: false, message: 'Gagal menghubungi server Neon Console.' });
+    } finally {
+      setIsTestingNeon(false);
+    }
+  };
+
+  const handleCopyNeonPairing = () => {
+    const link = neonSyncService.getShareableSyncLink(neonConfig);
+    navigator.clipboard.writeText(link);
+    setCopiedNeonPairingLink(true);
+    setTimeout(() => setCopiedNeonPairingLink(false), 3000);
+  };
+
+  const handleCopyNeonSql = () => {
+    navigator.clipboard.writeText(NEON_SQL_SCHEMA);
+    setCopiedNeonSql(true);
+    setTimeout(() => setCopiedNeonSql(false), 3000);
   };
 
   const handleSaveSupabase = (e: React.FormEvent) => {
@@ -237,86 +250,187 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       {/* 1. Neon Tech PostgreSQL Tab */}
       {activeTab === 'neon' && (
-        <form onSubmit={handleSaveNeon} className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
-              <Icons.Sparkles size={18} />
+        <div className="space-y-4">
+          <form onSubmit={handleSaveNeon} className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
+              <div
+                className={`p-2 rounded-lg mt-0.5 ${
+                  neonSyncService.isConfigured()
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-amber-500/20 text-amber-400'
+                }`}
+              >
+                <Icons.Sparkles size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">
+                  {neonSyncService.isConfigured()
+                    ? 'Neon Serverless PostgreSQL (proud-base-70292180) Siap'
+                    : 'Neon PostgreSQL Belum Dikonfigurasi'}
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  Database antum: <code className="text-emerald-400 font-mono font-bold">proud-base-70292180</code> di Neon Console. Masukkan connection string untuk mengaktifkan sinkronisasi otomatis Laptop & HP.
+                </p>
+              </div>
             </div>
+
             <div>
-              <p className="text-xs font-bold text-white">Neon Serverless PostgreSQL Terhubung</p>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                Project antum: <code className="text-emerald-400 font-mono font-bold">proud-base-70292180</code> di Neon Console.
-              </p>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Project ID Neon Console
+              </label>
+              <input
+                type="text"
+                value={neonConfig.projectId}
+                onChange={e => setNeonConfig({ ...neonConfig, projectId: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                placeholder="proud-base-70292180"
+              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Project ID Neon
-            </label>
-            <input
-              type="text"
-              value={neonConfig.projectId}
-              onChange={e => setNeonConfig({ ...neonConfig, projectId: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
-              placeholder="proud-base-70292180"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Connection String PostgreSQL (dari Neon Dashboard)
-            </label>
-            <input
-              type="password"
-              value={neonConfig.connectionString}
-              onChange={e => setNeonConfig({ ...neonConfig, connectionString: e.target.value })}
-              placeholder="postgresql://neondb_owner:***@ep-proud-base-70292180.us-east-2.aws.neon.tech/neondb?sslmode=require"
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-            />
-            <p className="text-[10px] text-slate-500 mt-1">
-              Dapat disalin langsung dari halaman utama Neon Console (Connection Details).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="enableNeon"
-              checked={neonConfig.isEnabled}
-              onChange={e => setNeonConfig({ ...neonConfig, isEnabled: e.target.checked })}
-              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
-            />
-            <label htmlFor="enableNeon" className="text-xs text-slate-300 cursor-pointer font-medium">
-              Aktifkan sinkronisasi cloud ke Neon Serverless PostgreSQL
-            </label>
-          </div>
-
-          <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-[11px] text-slate-300 space-y-2">
-            <p className="font-semibold text-emerald-300">
-              📌 Cara Eksekusi Tabel di Neon Console:
-            </p>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400">
-              <li>
-                Buka link:{' '}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                PostgreSQL Connection String (dari Neon Dashboard)
+              </label>
+              <input
+                type="password"
+                value={neonConfig.connectionString}
+                onChange={e => setNeonConfig({ ...neonConfig, connectionString: e.target.value })}
+                placeholder="postgresql://neondb_owner:***@ep-proud-base-70292180.us-east-2.aws.neon.tech/neondb?sslmode=require"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+              />
+              <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+                <span>Salin dari Neon Console ➔ Connection Details (Role: neondb_owner).</span>
                 <a
-                  href="https://console.neon.tech/app/projects/proud-base-70292180/branches"
+                  href="https://console.neon.tech/app/projects/proud-base-70292180"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-cyan-400 underline font-mono"
+                  className="text-cyan-400 hover:underline font-semibold"
                 >
-                  Neon Console (proud-base-70292180)
+                  Buka Neon Dashboard ↗
                 </a>
-              </li>
-              <li>Pilih menu <strong>SQL Editor</strong> di sidebar Neon.</li>
-              <li>
-                Buka file <code className="text-emerald-400 font-mono">neon/schema.sql</code> di proyek ini, lalu salin dan tempel isinya ke SQL Editor Neon.
-              </li>
-              <li>Klik tombol <strong>Run</strong>. Semua tabel langsung terbuat seketika!</li>
-            </ol>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="enableNeon"
+                checked={neonConfig.isEnabled}
+                onChange={e => setNeonConfig({ ...neonConfig, isEnabled: e.target.checked })}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
+              <label htmlFor="enableNeon" className="text-xs text-slate-300 cursor-pointer font-medium">
+                Aktifkan sinkronisasi cloud real-time ke Neon Serverless PostgreSQL (Laptop & HP)
+              </label>
+            </div>
+
+            {/* Test Connection Result Alert */}
+            {neonTestResult && (
+              <div
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                  neonTestResult.success
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : 'bg-red-500/15 border-red-500/30 text-red-300'
+                }`}
+              >
+                {neonTestResult.success ? <Icons.CheckCircle2 size={16} /> : <Icons.ShieldAlert size={16} />}
+                <span>{neonTestResult.message}</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-white/[0.08]">
+              <button
+                type="button"
+                onClick={handleTestNeon}
+                disabled={isTestingNeon}
+                className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/20 transition-all text-xs font-semibold cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Icons.RefreshCw size={14} className={isTestingNeon ? 'animate-spin' : ''} />
+                <span>{isTestingNeon ? 'Memeriksa Neon...' : '⚡ Uji Koneksi & Tabel Neon'}</span>
+              </button>
+              <Button type="submit" variant="aura" size="sm">
+                Simpan Konfigurasi Neon
+              </Button>
+            </div>
+          </form>
+
+          {/* 1-Click Mobile Pairing Feature for Neon */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/80 to-cyan-950/40 border border-emerald-500/30 space-y-2.5">
+            <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
+              <span className="text-base">📱</span>
+              <span>Hubungkan Neon ke HP (1-Klik Tanpa Ketik Connection String)</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Tidak perlu mengetik connection string database PostgreSQL yang panjang di smartphone! Klik tombol di bawah untuk menyalin tautan pairing otomatis, lalu buka tautan tersebut di browser HP (misal kirim ke WhatsApp antum).
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleCopyNeonPairing}
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border shadow-lg ${
+                  copiedNeonPairingLink
+                    ? 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/30'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/40 shadow-emerald-600/30 active:scale-[0.98]'
+                }`}
+              >
+                {copiedNeonPairingLink ? (
+                  <>
+                    <Icons.Check size={16} />
+                    <span>✓ Tautan Neon Tersalin! Silakan Buka di HP Antum</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📱</span>
+                    <span>Salin Tautan Pairing Neon ke HP</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.08]">
+          {/* SQL Schema Box for Neon */}
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/[0.08] space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-white">
+                <Icons.Database size={15} className="text-emerald-400" />
+                <span>Skema SQL Sinkronisasi Neon (`user_sync_data`)</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyNeonSql}
+                className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+              >
+                {copiedNeonSql ? (
+                  <>
+                    <Icons.Check size={12} />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📋</span>
+                    <span>Salin SQL</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Tabel <code className="text-emerald-300 font-mono font-bold">user_sync_data</code> akan dibuat otomatis saat antum menguji koneksi atau menyimpan. Antum juga bisa menjalankannya manual di{' '}
+              <a
+                href="https://console.neon.tech/app/projects/proud-base-70292180"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-400 underline font-semibold"
+              >
+                Neon SQL Editor
+              </a>
+              :
+            </p>
+            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-emerald-300 overflow-x-auto select-all leading-normal">
+              {NEON_SQL_SCHEMA}
+            </pre>
+          </div>
+
+          <div className="pt-2 flex justify-end">
             <button
               type="button"
               onClick={handleReset}
@@ -324,11 +438,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               Reset Data Demo Lokal
             </button>
-            <Button type="submit" variant="aura" size="sm">
-              Simpan Konfigurasi Neon
-            </Button>
           </div>
-        </form>
+        </div>
       )}
 
       {/* 2. Supabase Tab */}
