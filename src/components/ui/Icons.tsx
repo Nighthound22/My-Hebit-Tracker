@@ -373,4 +373,53 @@ export const Icons = {
       <path d="M3 12A9 3 0 0 0 21 12"/>
     </svg>
   ),
+
+  Crop: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2v14a2 2 0 0 0 2 2h14"/>
+      <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+    </svg>
+  ),
+
+  ZoomIn: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="11" y1="8" x2="11" y2="14"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>
+  ),
+
+  ZoomOut: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>
+  ),
+
+  RotateCw: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+      <path d="M21 3v5h-5"/>
+    </svg>
+  ),
+
+  Move: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="5 9 2 12 5 15"/>
+      <polyline points="9 5 12 2 15 5"/>
+      <polyline points="15 19 12 22 9 19"/>
+      <polyline points="19 9 22 12 19 15"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <line x1="12" y1="2" x2="12" y2="22"/>
+    </svg>
+  ),
+
+  Camera: ({ size = 18, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+      <circle cx="12" cy="13" r="3"/>
+    </svg>
+  ),
 };

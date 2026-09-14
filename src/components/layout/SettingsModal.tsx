@@ -12,6 +12,7 @@ import { supabaseSyncService } from '../../lib/supabaseSync';
 import { neonSyncService, NeonConfig } from '../../lib/neonSync';
 import { safeStorage } from '../../lib/storage';
 import { useAuth } from '../../hooks/useAuth';
+import { AvatarCropperModal } from './AvatarCropperModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -72,30 +73,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [waterTarget, setWaterTarget] = useState(profile.daily_water_target);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // States untuk Editor Penyesuaian / Crop Foto Profil
+  const [isCropperOpen, setIsCropperOpen] = useState<boolean>(false);
+  const [imageToCrop, setImageToCrop] = useState<string>('');
+
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran gambar maksimal 5MB.');
+      if (file.size > 8 * 1024 * 1024) {
+        alert('Ukuran berkas gambar maksimal 8MB.');
         return;
       }
       const reader = new FileReader();
       reader.onload = () => {
-        const base64 = reader.result as string;
-        setAvatarUrl(base64);
-        // Otomatis sinkronkan ke profil dan sesi auth agar langsung muncul di dashboard
-        onUpdateProfile({
-          ...profile,
-          avatar_url: base64,
-        });
-        if (user) {
-          updateUser({ picture: base64 });
-        }
-        setSaveMessage('✓ Foto berhasil diunggah dan disimpan!');
-        setTimeout(() => setSaveMessage(null), 3000);
+        const rawBase64 = reader.result as string;
+        // Buka langsung modal editor pemotong & penyesuaian foto!
+        setImageToCrop(rawBase64);
+        setIsCropperOpen(true);
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = '';
+  };
+
+  const handleOpenCurrentPhotoEditor = () => {
+    const currentPhoto = avatarUrl || profile.avatar_url || user?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+    setImageToCrop(currentPhoto);
+    setIsCropperOpen(true);
+  };
+
+  const handleSaveCroppedAvatar = (croppedBase64: string) => {
+    setAvatarUrl(croppedBase64);
+    onUpdateProfile({
+      ...profile,
+      avatar_url: croppedBase64,
+    });
+    if (user) {
+      updateUser({ picture: croppedBase64 });
+    }
+    setSaveMessage('✓ Foto profil berhasil dipotong & disesuaikan!');
+    setTimeout(() => setSaveMessage(null), 3000);
   };
 
   const handleSaveNeon = (e: React.FormEvent) => {
@@ -603,20 +620,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       {/* 3. Profil Tab */}
       {activeTab === 'profile' && (
         <form onSubmit={handleSaveProfile} className="space-y-4">
-          {/* Avatar Change Section */}
+          {/* Banner Ketentuan Standar Foto Profil */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-950/40 via-[#111425] to-cyan-950/30 border border-violet-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Icons.Crop size={18} />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-white">Standar Ukuran Foto Profil</h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-semibold border border-cyan-500/30">
+                    Rasio 1:1 Persegi
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Dimensi Target: <strong>400 × 400 piksel</strong> • Ukuran file optimal & ringan diakses di HP & Laptop.
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  💡 Gunakan tombol <strong>"Sesuaikan / Crop Foto"</strong> untuk menggeser posisi atau zoom wajah agar proporsional dan tidak terpotong sembarangan.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Avatar Change & Crop Section */}
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
-            <div className="relative group">
-              <img
-                src={avatarUrl || profile.avatar_url || user?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                alt={fullName}
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-violet-500 shadow-xl shadow-violet-500/20"
-              />
+            <div className="relative group shrink-0">
+              <div className="w-20 h-20 rounded-2xl p-[2px] bg-gradient-to-tr from-violet-500 via-indigo-500 to-cyan-400 shadow-xl shadow-violet-500/25">
+                <div className="w-full h-full rounded-[14px] overflow-hidden bg-[#0E111D]">
+                  <img
+                    src={avatarUrl || profile.avatar_url || user?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                    alt={fullName}
+                    className="w-full h-full object-cover object-center"
+                  />
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-bold text-white transition-opacity cursor-pointer"
+                onClick={handleOpenCurrentPhotoEditor}
+                className="absolute inset-0 bg-black/70 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[10px] font-bold text-white transition-opacity cursor-pointer gap-1"
+                title="Buka editor untuk atur posisi & zoom foto ini"
               >
-                Ganti Foto
+                <Icons.Crop size={16} />
+                <span>Sesuaikan</span>
               </button>
             </div>
 
@@ -624,7 +670,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <h4 className="text-xs font-bold text-white">Foto Profil Akun</h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Foto akan otomatis tersimpan ke profil database antum.
+                  Foto tersimpan di database Cloud Neon dan otomatis disinkronkan ke HP & Laptop.
                 </p>
               </div>
 
@@ -638,12 +684,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  icon={<Icons.Sparkles size={14} />}
+                  icon={<Icons.Camera size={14} />}
                 >
-                  Pilih Foto dari Galeri
+                  Unggah Foto Baru
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleOpenCurrentPhotoEditor}
+                  icon={<Icons.Crop size={14} />}
+                >
+                  Sesuaikan / Crop Foto Ini
                 </Button>
 
                 {avatarUrl !== profile.avatar_url && (
@@ -780,6 +836,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </form>
       )}
+
+      {/* Modal Editor Pemotong & Penyesuaian Posisi Foto Profil */}
+      <AvatarCropperModal
+        isOpen={isCropperOpen}
+        imageUrl={imageToCrop}
+        onClose={() => setIsCropperOpen(false)}
+        onSaveCropped={handleSaveCroppedAvatar}
+      />
     </Modal>
   );
 };

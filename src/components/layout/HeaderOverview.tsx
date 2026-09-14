@@ -101,15 +101,27 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
         <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex items-center gap-4">
-          <div className="relative group cursor-pointer" onClick={onOpenSettings} title="Klik untuk ubah foto & profil">
-            <img
-              src={effectiveAvatar}
-              alt={effectiveName}
-              className="w-13 h-13 rounded-2xl object-cover border-2 border-violet-500/40 shadow-lg shadow-violet-500/25 group-hover:scale-105 transition-transform"
-            />
+          {/* Standar Ukuran Foto Profil: Strict 1:1 Squircle Badge (64px / 72px) */}
+          <div
+            className="relative group cursor-pointer shrink-0 select-none"
+            onClick={onOpenSettings}
+            title="Klik untuk ubah & sesuaikan foto profil"
+          >
+            <div className="w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] rounded-2xl p-[2px] bg-gradient-to-tr from-violet-500 via-indigo-500 to-cyan-400 shadow-xl shadow-violet-500/25 group-hover:shadow-cyan-400/40 transition-all duration-300">
+              <div className="w-full h-full rounded-[14px] overflow-hidden bg-[#0E111D] relative">
+                <img
+                  src={effectiveAvatar}
+                  alt={effectiveName}
+                  className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">Ubah</span>
+                </div>
+              </div>
+            </div>
             {/* Live radar pulse on status dot */}
             <div className="absolute -bottom-1 -right-1 flex items-center justify-center">
-              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-emerald-400 opacity-75" />
+              <span className="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[#0E111F]" />
             </div>
           </div>

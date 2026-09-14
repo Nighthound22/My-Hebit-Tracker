@@ -68,7 +68,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
         <img
           src={user.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
           alt={user.name}
-          className="w-7 h-7 rounded-lg object-cover border border-violet-500/40"
+          className="w-8 h-8 rounded-lg object-cover border border-violet-500/40 shrink-0"
         />
         <div className="text-left hidden sm:block pr-1">
           <p className="text-xs font-bold text-white leading-none truncate max-w-[120px]">{user.name}</p>

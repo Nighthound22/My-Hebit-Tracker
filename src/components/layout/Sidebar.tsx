@@ -226,11 +226,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={`${displayName} (${user?.email || 'Google Verified'})`}
           >
             <div className="relative shrink-0">
-              <img
-                src={displayAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                alt={displayName}
-                className="w-9 h-9 rounded-xl object-cover border border-violet-500/40 shrink-0"
-              />
+              <div className="w-[40px] h-[40px] rounded-xl p-[1.5px] bg-gradient-to-tr from-violet-500/50 to-cyan-400/50 shadow-md shadow-violet-500/10">
+                <div className="w-full h-full rounded-[9px] overflow-hidden bg-[#0E111D]">
+                  <img
+                    src={displayAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                    alt={displayName}
+                    className="w-full h-full object-cover object-center"
+                  />
+                </div>
+              </div>
               {user && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0E111D] rounded-full" />
               )}
