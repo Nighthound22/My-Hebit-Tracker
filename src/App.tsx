@@ -45,6 +45,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [calendarSyncError, setCalendarSyncError] = useState<string | null>(null);
+  const [calendarSyncSuccess, setCalendarSyncSuccess] = useState<string | null>(null);
 
   // Sidebar Collapsed / Dock Mode State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -141,6 +142,15 @@ export default function App() {
     }
   };
 
+  // Audio preview handler
+  const handlePreviewAudio = (theme: 'rain' | 'waves' | 'bell' | 'off') => {
+    if (theme === 'bell') {
+      soundSynth.play('bell');
+    } else if (theme === 'rain') {
+      soundSynth.play('rain');
+    }
+  };
+
   // Handler Sinkronisasi Google Calendar Asli
   const handleSyncGoogleCalendar = async () => {
     if (!isAuthenticated) {
@@ -150,19 +160,18 @@ export default function App() {
 
     setIsSyncingCalendar(true);
     setCalendarSyncError(null);
+    setCalendarSyncSuccess(null);
 
     try {
       const googleBlocks = await GoogleCalendarService.fetchTodayEvents();
-      if (googleBlocks.length === 0) {
-        setCalendarSyncError('Tidak ada agenda Google Calendar ditemukan untuk hari ini.');
-        setTimeout(() => setCalendarSyncError(null), 4000);
-      } else {
-        mergeGoogleTimeBlocks(googleBlocks);
-      }
+      mergeGoogleTimeBlocks(googleBlocks);
+      soundSynth.play('bell');
+      setCalendarSyncSuccess(`Berhasil menyinkronkan ${googleBlocks.length} agenda Google Calendar ke lini waktu!`);
+      setTimeout(() => setCalendarSyncSuccess(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menyinkronkan Google Calendar.';
       setCalendarSyncError(msg);
-      setTimeout(() => setCalendarSyncError(null), 7000);
+      setTimeout(() => setCalendarSyncError(null), 6000);
     } finally {
       setIsSyncingCalendar(false);
     }
@@ -279,6 +288,7 @@ export default function App() {
                   onSyncGoogleCalendar={handleSyncGoogleCalendar}
                   isSyncingCalendar={isSyncingCalendar}
                   calendarSyncError={calendarSyncError}
+                  calendarSyncSuccess={calendarSyncSuccess}
                   onOpenLoginModal={() => setIsLoginModalOpen(true)}
                   isAuthenticated={isAuthenticated}
                 />
@@ -322,6 +332,7 @@ export default function App() {
                 onSyncGoogleCalendar={handleSyncGoogleCalendar}
                 isSyncingCalendar={isSyncingCalendar}
                 calendarSyncError={calendarSyncError}
+                calendarSyncSuccess={calendarSyncSuccess}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
                 isAuthenticated={isAuthenticated}
               />
@@ -374,6 +385,7 @@ export default function App() {
               onSyncGoogleCalendar={handleSyncGoogleCalendar}
               isSyncingCalendar={isSyncingCalendar}
               calendarSyncError={calendarSyncError}
+              calendarSyncSuccess={calendarSyncSuccess}
               onOpenLoginModal={() => setIsLoginModalOpen(true)}
               isAuthenticated={isAuthenticated}
             />

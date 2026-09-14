@@ -34,6 +34,22 @@ export const useAuth = () => {
     }
   };
 
+  const loginWithGmailFast = (email: string, name?: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const loggedUser = googleAuthService.loginWithGmailFast(email, name);
+      setUser(loggedUser);
+      return loggedUser;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal login Gmail.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     googleAuthService.logout();
     setUser(null);
@@ -45,6 +61,7 @@ export const useAuth = () => {
     isLoading,
     error,
     loginWithGoogle,
+    loginWithGmailFast,
     logout,
   };
 };

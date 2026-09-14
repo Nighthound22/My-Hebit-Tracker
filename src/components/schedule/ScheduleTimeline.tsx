@@ -18,6 +18,7 @@ interface ScheduleTimelineProps {
   onSyncGoogleCalendar: () => Promise<void>;
   isSyncingCalendar?: boolean;
   calendarSyncError?: string | null;
+  calendarSyncSuccess?: string | null;
   onOpenLoginModal: () => void;
   isAuthenticated?: boolean;
 }
@@ -29,6 +30,7 @@ export const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({
   onSyncGoogleCalendar,
   isSyncingCalendar = false,
   calendarSyncError = null,
+  calendarSyncSuccess = null,
   onOpenLoginModal,
   isAuthenticated = false,
 }) => {
@@ -179,6 +181,13 @@ export const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({
       </div>
 
       {/* Alarm / Calendar Feedback Notice */}
+      {calendarSyncSuccess && (
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <Icons.CheckCircle size={16} className="text-emerald-400 shrink-0" />
+          <span className="font-semibold">{calendarSyncSuccess}</span>
+        </div>
+      )}
+
       {alarmFeedback && (
         <div className="mb-4 p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2 animate-in fade-in">
           <Icons.Clock size={15} />

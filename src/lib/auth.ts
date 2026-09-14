@@ -114,6 +114,28 @@ class GoogleAuthService {
     this.notify();
   }
 
+  // Jalan Pintas Masuk Akun Gmail Langsung (Tanpa Ribet Konfigurasi Google Cloud)
+  public loginWithGmailFast(email: string, name?: string): AuthUser {
+    const cleanEmail = (email || '').trim() || 'achmadali220102@gmail.com';
+    let userName = name;
+    if (!userName) {
+      const part = cleanEmail.split('@')[0];
+      userName = part.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    const authUser: AuthUser = {
+      id: `gmail-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '')}`,
+      email: cleanEmail,
+      name: userName,
+      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8B5CF6&color=fff&size=200&bold=true`,
+      accessToken: `fast-token-${Date.now()}`,
+      expiresAt: Date.now() + 365 * 24 * 3600 * 1000, // Aktif 1 tahun
+    };
+
+    this.saveSession(authUser);
+    return authUser;
+  }
+
   // Real Google OAuth 2.0 Popup Login
   public async loginWithGoogle(): Promise<AuthUser> {
     const clientId = this.getClientId();
