@@ -1,5 +1,5 @@
 // ==============================================================================
-// Modal Pengaturan (Supabase Sync & Profil Pengguna)
+// Modal Pengaturan (Supabase, Neon Serverless PostgreSQL, & Profil Pengguna)
 // ==============================================================================
 
 import React, { useState } from 'react';
@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { Icons } from '../ui/Icons';
 import { UserProfile } from '../../types';
 import { supabaseService, SupabaseConfig } from '../../lib/supabase';
+import { safeStorage } from '../../lib/storage';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,6 +18,12 @@ interface SettingsModalProps {
   onResetAllData: () => void;
 }
 
+interface NeonConfig {
+  connectionString: string;
+  projectId: string;
+  isEnabled: boolean;
+}
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -24,11 +31,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateProfile,
   onResetAllData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'supabase' | 'profile'>('supabase');
+  const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
+  
+  // Neon Config
+  const [neonConfig, setNeonConfig] = useState<NeonConfig>(() => {
+    const raw = safeStorage.getItem('aura_neon_config_v1');
+    if (!raw) {
+      return {
+        connectionString: '',
+        projectId: 'proud-base-70292180',
+        isEnabled: false,
+      };
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {
+        connectionString: '',
+        projectId: 'proud-base-70292180',
+        isEnabled: false,
+      };
+    }
+  });
+
   const [fullName, setFullName] = useState(profile.full_name);
   const [waterTarget, setWaterTarget] = useState(profile.daily_water_target);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const handleSaveNeon = (e: React.FormEvent) => {
+    e.preventDefault();
+    safeStorage.setItem('aura_neon_config_v1', JSON.stringify(neonConfig));
+    setSaveMessage('Konfigurasi Neon PostgreSQL berhasil disimpan!');
+    setTimeout(() => setSaveMessage(null), 3000);
+  };
 
   const handleSaveSupabase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,25 +97,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Pengaturan Aplikasi & Sinkronisasi"
-      subtitle="Konfigurasi database cloud Supabase, profil pengguna, dan data lokal"
+      title="Pengaturan Database & Sinkronisasi Cloud"
+      subtitle="Koneksikan ke Neon Serverless PostgreSQL atau Supabase"
       maxWidth="lg"
     >
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/[0.08] mb-5 pb-2">
+      <div className="flex items-center gap-2 border-b border-white/[0.08] mb-5 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('neon')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'neon'
+              ? 'bg-gradient-to-r from-emerald-600/30 to-cyan-500/20 text-white border border-emerald-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Neon.tech PostgreSQL ⚡
+        </button>
         <button
           onClick={() => setActiveTab('supabase')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'supabase'
               ? 'bg-violet-600/30 text-white border border-violet-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Supabase Cloud Sync
+          Supabase Sync
         </button>
         <button
           onClick={() => setActiveTab('profile')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'profile'
               ? 'bg-violet-600/30 text-white border border-violet-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -96,9 +142,105 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       )}
 
-      {activeTab === 'supabase' ? (
+      {/* 1. Neon Tech PostgreSQL Tab */}
+      {activeTab === 'neon' && (
+        <form onSubmit={handleSaveNeon} className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+              <Icons.Sparkles size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">Neon Serverless PostgreSQL Terhubung</p>
+              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                Project antum: <code className="text-emerald-400 font-mono font-bold">proud-base-70292180</code> di Neon Console.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Project ID Neon
+            </label>
+            <input
+              type="text"
+              value={neonConfig.projectId}
+              onChange={e => setNeonConfig({ ...neonConfig, projectId: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="proud-base-70292180"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Connection String PostgreSQL (dari Neon Dashboard)
+            </label>
+            <input
+              type="password"
+              value={neonConfig.connectionString}
+              onChange={e => setNeonConfig({ ...neonConfig, connectionString: e.target.value })}
+              placeholder="postgresql://neondb_owner:***@ep-proud-base-70292180.us-east-2.aws.neon.tech/neondb?sslmode=require"
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">
+              Dapat disalin langsung dari halaman utama Neon Console (Connection Details).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="enableNeon"
+              checked={neonConfig.isEnabled}
+              onChange={e => setNeonConfig({ ...neonConfig, isEnabled: e.target.checked })}
+              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+            />
+            <label htmlFor="enableNeon" className="text-xs text-slate-300 cursor-pointer font-medium">
+              Aktifkan sinkronisasi cloud ke Neon Serverless PostgreSQL
+            </label>
+          </div>
+
+          <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-[11px] text-slate-300 space-y-2">
+            <p className="font-semibold text-emerald-300">
+              📌 Cara Eksekusi Tabel di Neon Console:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400">
+              <li>
+                Buka link:{' '}
+                <a
+                  href="https://console.neon.tech/app/projects/proud-base-70292180/branches"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 underline font-mono"
+                >
+                  Neon Console (proud-base-70292180)
+                </a>
+              </li>
+              <li>Pilih menu <strong>SQL Editor</strong> di sidebar Neon.</li>
+              <li>
+                Buka file <code className="text-emerald-400 font-mono">neon/schema.sql</code> di proyek ini, lalu salin dan tempel isinya ke SQL Editor Neon.
+              </li>
+              <li>Klik tombol <strong>Run</strong>. Semua tabel langsung terbuat seketika!</li>
+            </ol>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-white/[0.08]">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs text-red-400 hover:text-red-300 underline font-medium cursor-pointer"
+            >
+              Reset Data Demo Lokal
+            </button>
+            <Button type="submit" variant="aura" size="sm">
+              Simpan Konfigurasi Neon
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* 2. Supabase Tab */}
+      {activeTab === 'supabase' && (
         <form onSubmit={handleSaveSupabase} className="space-y-4">
-          {/* Status Badge */}
           <div className="p-3 rounded-xl bg-slate-900/80 border border-white/[0.06] flex items-start gap-3">
             <div
               className={`p-2 rounded-lg mt-0.5 ${
@@ -156,24 +298,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="p-3 bg-violet-950/20 border border-violet-500/20 rounded-xl text-[11px] text-slate-300">
             💡 Skema SQL database Supabase sudah tersedia di berkas{' '}
-            <code className="text-cyan-400 font-mono">supabase/schema.sql</code>. Anda dapat menyalinnya
-            langsung ke Supabase SQL Editor.
+            <code className="text-cyan-400 font-mono">supabase/schema.sql</code>.
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.08]">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-xs text-red-400 hover:text-red-300 underline font-medium cursor-pointer"
-            >
-              Reset Semua Data Demo
-            </button>
+          <div className="flex items-center justify-end pt-3 border-t border-white/[0.08]">
             <Button type="submit" variant="aura" size="sm">
-              Simpan Konfigurasi
+              Simpan Konfigurasi Supabase
             </Button>
           </div>
         </form>
-      ) : (
+      )}
+
+      {/* 3. Profil Tab */}
+      {activeTab === 'profile' && (
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
