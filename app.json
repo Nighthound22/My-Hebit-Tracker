@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Aura Habit & Productivity Tracker",
+    "slug": "aura-habit-tracker",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090B12",
+    "splash": {
+      "backgroundColor": "#090B12",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aura.habittracker"
+    },
+    "android": {
+      "package": "com.aura.habittracker",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#090B12",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
