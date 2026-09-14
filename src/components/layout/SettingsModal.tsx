@@ -207,8 +207,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       subtitle="Koneksikan ke Neon Serverless PostgreSQL atau Supabase"
       maxWidth="lg"
     >
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/[0.08] mb-5 pb-2 overflow-x-auto">
+      {/* Tabs Bar (Sticky di atas saat scroll) */}
+      <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 -mt-1 mb-4 overflow-x-auto sticky -top-4 sm:-top-6 bg-[#131627] pt-1 z-20">
         <button
           onClick={() => setActiveTab('neon')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -425,7 +425,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </a>
               :
             </p>
-            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-emerald-300 overflow-x-auto select-all leading-normal">
+            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-emerald-300 max-h-28 overflow-y-auto select-all leading-normal">
               {NEON_SQL_SCHEMA}
             </pre>
           </div>
@@ -593,7 +593,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[11px] text-slate-400 leading-relaxed">
               Jalankan perintah SQL ini di menu <strong>SQL Editor</strong> Supabase antum satu kali untuk mengaktifkan sinkronisasi otomatis Laptop & HP:
             </p>
-            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-cyan-300 overflow-x-auto select-all leading-normal">
+            <pre className="p-3 rounded-xl bg-black/60 border border-white/5 text-[10px] font-mono text-cyan-300 max-h-28 overflow-y-auto select-all leading-normal">
               {SYNC_SQL_SCHEMA}
             </pre>
           </div>
