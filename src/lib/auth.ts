@@ -9,10 +9,9 @@ import { safeStorage } from './storage';
 const AUTH_STORAGE_KEY = 'aura_auth_user_v1';
 const GOOGLE_CLIENT_ID_KEY = 'aura_google_client_id_v1';
 
-// Default / fallback Google Client ID (dapat diubah di Settings atau .env)
+// Default Google Client ID dari Environment (.env atau Vercel Environment Variables)
 const DEFAULT_CLIENT_ID =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) ||
-  '942475454655-0g2i4t9l1r4a0g49e414c8p1k9a3p5.apps.googleusercontent.com';
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || '';
 
 declare global {
   interface Window {
@@ -45,7 +44,18 @@ class GoogleAuthService {
   }
 
   public getClientId(): string {
-    return safeStorage.getItem(GOOGLE_CLIENT_ID_KEY) || DEFAULT_CLIENT_ID;
+    const stored = safeStorage.getItem(GOOGLE_CLIENT_ID_KEY);
+    if (stored && stored.startsWith('942475454655')) {
+      // Clear old dummy placeholder
+      safeStorage.removeItem(GOOGLE_CLIENT_ID_KEY);
+      return DEFAULT_CLIENT_ID;
+    }
+    return stored || DEFAULT_CLIENT_ID;
+  }
+
+  public hasValidClientId(): boolean {
+    const id = this.getClientId();
+    return !!id && !id.startsWith('942475454655') && id.includes('.apps.googleusercontent.com');
   }
 
   public setClientId(clientId: string): void {
@@ -107,6 +117,14 @@ class GoogleAuthService {
   // Real Google OAuth 2.0 Popup Login
   public async loginWithGoogle(): Promise<AuthUser> {
     const clientId = this.getClientId();
+
+    if (!clientId || clientId.startsWith('942475454655') || !clientId.includes('.apps.googleusercontent.com')) {
+      return Promise.reject(
+        new Error(
+          'Google Client ID resmi belum dimasukkan. Silakan tempel Google OAuth Client ID dari Google Cloud Console antum pada kolom di bawah.'
+        )
+      );
+    }
 
     return new Promise((resolve, reject) => {
       if (typeof window === 'undefined' || !window.google?.accounts?.oauth2) {
