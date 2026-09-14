@@ -6,6 +6,7 @@
 import React from 'react';
 import { Icons } from '../ui/Icons';
 import { NavigationTab, UserProfile } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -28,6 +29,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   isCloudConnected,
 }) => {
+  const { user } = useAuth();
+  const displayName = user?.name || profile.full_name;
+  const displayAvatar = user?.picture || profile.avatar_url;
   const navItems = [
     { id: 'dashboard' as NavigationTab, label: 'Dashboard', icon: Icons.Grid, badge: null },
     { id: 'habits' as NavigationTab, label: 'Habit Tracker', icon: Icons.Sparkles, badge: '5 Aktif' },
@@ -157,13 +161,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Snapshot Profile */}
         <div className="flex items-center gap-3 px-1 py-1">
           <img
-            src={profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-            alt={profile.full_name}
+            src={displayAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+            alt={displayName}
             className="w-9 h-9 rounded-xl object-cover border border-violet-500/30"
           />
           <div className="overflow-hidden">
-            <p className="text-xs font-bold text-white truncate">{profile.full_name}</p>
-            <p className="text-[10px] text-slate-400 truncate">Aura Pro Member</p>
+            <p className="text-xs font-bold text-white truncate">{displayName}</p>
+            <p className="text-[10px] text-emerald-400 truncate font-medium">
+              {user ? '✓ Google Verified' : 'Aura Pro Member'}
+            </p>
           </div>
         </div>
       </div>

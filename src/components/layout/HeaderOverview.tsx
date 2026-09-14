@@ -7,6 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
 import { Icons } from '../ui/Icons';
 import { DailyMetrics, UserProfile } from '../../types';
+import { UserDropdown } from '../auth/UserDropdown';
+import { useAuth } from '../../hooks/useAuth';
 
 interface HeaderOverviewProps {
   profile: UserProfile;
@@ -14,6 +16,7 @@ interface HeaderOverviewProps {
   quote: { text: string; author: string };
   onOpenSettings: () => void;
   onOpenCommandPalette: () => void;
+  onOpenLoginModal?: () => void;
 }
 
 export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
@@ -22,7 +25,9 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
   quote,
   onOpenSettings,
   onOpenCommandPalette,
+  onOpenLoginModal,
 }) => {
+  const { user } = useAuth();
   const [time, setTime] = useState<Date>(new Date());
   const [quoteAnim, setQuoteAnim] = useState(false);
 
@@ -78,8 +83,8 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
         <div className="relative z-10 flex items-center gap-4">
           <div className="relative group">
             <img
-              src={profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-              alt={profile.full_name}
+              src={user?.picture || profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+              alt={user?.name || profile.full_name}
               className="w-13 h-13 rounded-2xl object-cover border-2 border-violet-500/40 shadow-lg shadow-violet-500/25 group-hover:scale-105 transition-transform"
             />
             {/* Live radar pulse on status dot */}
@@ -94,7 +99,7 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
               <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
                 {getGreeting()},{' '}
                 <span className="bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
-                  {profile.full_name}
+                  {user?.name || profile.full_name}
                 </span>
                 !
               </h1>
@@ -104,12 +109,24 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
               <span>{formattedDate}</span>
               <span className="w-1 h-1 rounded-full bg-slate-600" />
               <span className="text-cyan-300 font-mono font-bold tracking-wider">{formattedTime} WIB</span>
+              {user && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-600" />
+                  <span className="text-emerald-400 font-medium text-xs">● Google Connected</span>
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        {/* Command Palette Pill Trigger & Actions */}
+        {/* Command Palette Pill Trigger, User Dropdown & Actions */}
         <div className="relative z-10 flex items-center gap-3">
+          {/* User Auth Google Dropdown */}
+          <UserDropdown
+            onOpenLoginModal={onOpenLoginModal || (() => {})}
+            onOpenSettings={onOpenSettings}
+          />
+
           {/* Linear / Raycast Style Command Button */}
           <button
             onClick={onOpenCommandPalette}
@@ -117,7 +134,7 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
             title="Buka Command Palette (Ctrl+K)"
           >
             <Icons.Sparkles size={15} color="#A78BFA" />
-            <span className="text-xs font-medium text-slate-300 group-hover:text-white">Cari / Perintah...</span>
+            <span className="text-xs font-medium text-slate-300 group-hover:text-white hidden sm:inline">Cari / Perintah...</span>
             <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] font-mono text-slate-400 border border-white/10 group-hover:border-violet-500/50">
               ⌘K
             </kbd>

@@ -158,6 +158,13 @@ export const useHabitData = () => {
     setTimeBlocks(prev => prev.filter(b => b.id !== blockId));
   }, []);
 
+  const mergeGoogleTimeBlocks = useCallback((googleBlocks: TimeBlock[]) => {
+    setTimeBlocks(prev => {
+      const nonGoogle = prev.filter(b => !b.isGoogleEvent);
+      return [...nonGoogle, ...googleBlocks].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    });
+  }, []);
+
   // --- Operasi Focus Session ---
   const logFocusSession = useCallback((minutes: number, type: 'focus' | 'short_break' | 'long_break') => {
     const newSession: FocusSession = {
@@ -280,6 +287,7 @@ export const useHabitData = () => {
     deleteTask,
     addTimeBlock,
     deleteTimeBlock,
+    mergeGoogleTimeBlocks,
     logFocusSession,
     addWaterCup,
     removeWaterCup,

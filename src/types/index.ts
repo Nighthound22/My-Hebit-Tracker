@@ -70,14 +70,41 @@ export interface TimeBlock {
   category: TimeBlockCategory;
   day_of_week?: number; // 1-7
   notes?: string;
+  isGoogleEvent?: boolean;
+  sourceLink?: string;
 }
 
 export interface UserProfile {
   id: string;
   full_name: string;
+  email?: string;
   avatar_url?: string;
   daily_water_target: number;
   created_at?: string;
+}
+
+export interface AuthUser {
+  id: string; // Google sub ID
+  email: string;
+  name: string;
+  picture?: string;
+  accessToken?: string;
+  expiresAt?: number;
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: {
+    dateTime?: string;
+    date?: string;
+  };
+  end: {
+    dateTime?: string;
+    date?: string;
+  };
+  htmlLink?: string;
 }
 
 export interface QuickNote {

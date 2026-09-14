@@ -6,7 +6,10 @@
 import React, { useState, useEffect } from 'react';
 import { useResponsive } from './hooks/useResponsive';
 import { useHabitData } from './hooks/useHabitData';
+import { useAuth } from './hooks/useAuth';
 import { supabaseService } from './lib/supabase';
+import { GoogleCalendarService } from './lib/googleCalendar';
+import { notificationService } from './lib/notificationService';
 import { soundSynth } from './lib/audioSynth';
 import { NavigationTab, TaskQuadrant } from './types';
 
@@ -16,6 +19,7 @@ import { BottomNav } from './components/layout/BottomNav';
 import { HeaderOverview } from './components/layout/HeaderOverview';
 import { SettingsModal } from './components/layout/SettingsModal';
 import { CommandPalette } from './components/ui/CommandPalette';
+import { LoginModal } from './components/auth/LoginModal';
 
 // Feature Components
 import { HabitTrackerMatrix } from './components/habits/HabitTrackerMatrix';
@@ -34,6 +38,12 @@ import { AnalyticsOverview } from './components/widgets/AnalyticsOverview';
 export default function App() {
   const { isDesktop, isMobile } = useResponsive();
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
+
+  // Otentikasi Google OAuth 2.0
+  const { isAuthenticated } = useAuth();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [calendarSyncError, setCalendarSyncError] = useState<string | null>(null);
 
   // Modals state
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -63,6 +73,7 @@ export default function App() {
     deleteTask,
     addTimeBlock,
     deleteTimeBlock,
+    mergeGoogleTimeBlocks,
     logFocusSession,
     addWaterCup,
     removeWaterCup,
@@ -73,6 +84,14 @@ export default function App() {
   } = useHabitData();
 
   const isCloudConnected = supabaseService.isConnected();
+
+  // Background Periodic Alarm & Notification Checker (Setiap 15 Detik)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      notificationService.checkScheduledAlarms(timeBlocks);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [timeBlocks]);
 
   // Global Keyboard Shortcuts (Ctrl+K / Cmd+K)
   useEffect(() => {
@@ -100,6 +119,33 @@ export default function App() {
     }
   };
 
+  // Handler Sinkronisasi Google Calendar Asli
+  const handleSyncGoogleCalendar = async () => {
+    if (!isAuthenticated) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    setIsSyncingCalendar(true);
+    setCalendarSyncError(null);
+
+    try {
+      const googleBlocks = await GoogleCalendarService.fetchTodayEvents();
+      if (googleBlocks.length === 0) {
+        setCalendarSyncError('Tidak ada agenda Google Calendar ditemukan untuk hari ini.');
+        setTimeout(() => setCalendarSyncError(null), 4000);
+      } else {
+        mergeGoogleTimeBlocks(googleBlocks);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyinkronkan Google Calendar.';
+      setCalendarSyncError(msg);
+      setTimeout(() => setCalendarSyncError(null), 5000);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col md:flex-row antialiased selection:bg-violet-500/30">
       {/* 1. Permanent Sidebar for Desktop (> 1024px) */}
@@ -118,13 +164,14 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto pb-24 md:pb-8 w-full">
-        {/* Daily Overview Header (PRD 3.1) with Command Palette Trigger */}
+        {/* Daily Overview Header (PRD 3.1) with Command Palette Trigger & Google Auth */}
         <HeaderOverview
           profile={profile}
           metrics={metrics}
           quote={dailyQuote}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenLoginModal={() => setIsLoginModalOpen(true)}
         />
 
         {/* View Switcher based on Navigation Tab */}
@@ -202,6 +249,11 @@ export default function App() {
                   timeBlocks={timeBlocks}
                   onOpenAddModal={() => setIsAddTimeBlockOpen(true)}
                   onDeleteTimeBlock={deleteTimeBlock}
+                  onSyncGoogleCalendar={handleSyncGoogleCalendar}
+                  isSyncingCalendar={isSyncingCalendar}
+                  calendarSyncError={calendarSyncError}
+                  onOpenLoginModal={() => setIsLoginModalOpen(true)}
+                  isAuthenticated={isAuthenticated}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <PomodoroTimer onSessionCompleted={logFocusSession} />
@@ -240,6 +292,11 @@ export default function App() {
                 timeBlocks={timeBlocks}
                 onOpenAddModal={() => setIsAddTimeBlockOpen(true)}
                 onDeleteTimeBlock={deleteTimeBlock}
+                onSyncGoogleCalendar={handleSyncGoogleCalendar}
+                isSyncingCalendar={isSyncingCalendar}
+                calendarSyncError={calendarSyncError}
+                onOpenLoginModal={() => setIsLoginModalOpen(true)}
+                isAuthenticated={isAuthenticated}
               />
             )}
           </div>
@@ -287,6 +344,11 @@ export default function App() {
               timeBlocks={timeBlocks}
               onOpenAddModal={() => setIsAddTimeBlockOpen(true)}
               onDeleteTimeBlock={deleteTimeBlock}
+              onSyncGoogleCalendar={handleSyncGoogleCalendar}
+              isSyncingCalendar={isSyncingCalendar}
+              calendarSyncError={calendarSyncError}
+              onOpenLoginModal={() => setIsLoginModalOpen(true)}
+              isAuthenticated={isAuthenticated}
             />
           </div>
         )}
@@ -362,6 +424,11 @@ export default function App() {
         profile={profile}
         onUpdateProfile={setProfile}
         onResetAllData={resetAllData}
+      />
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
       />
     </div>
   );
