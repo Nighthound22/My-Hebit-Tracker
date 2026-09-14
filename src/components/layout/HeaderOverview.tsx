@@ -7,7 +7,6 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
 import { Icons } from '../ui/Icons';
 import { DailyMetrics, UserProfile } from '../../types';
-import { UserDropdown } from '../auth/UserDropdown';
 import { useAuth } from '../../hooks/useAuth';
 
 interface HeaderOverviewProps {
@@ -15,8 +14,7 @@ interface HeaderOverviewProps {
   metrics: DailyMetrics;
   quote: { text: string; author: string };
   onOpenSettings: () => void;
-  onOpenCommandPalette: () => void;
-  onOpenLoginModal?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
@@ -24,8 +22,6 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
   metrics,
   quote,
   onOpenSettings,
-  onOpenCommandPalette,
-  onOpenLoginModal,
 }) => {
   const { user } = useAuth();
   const [time, setTime] = useState<Date>(new Date());
@@ -109,39 +105,14 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
               <span>{formattedDate}</span>
               <span className="w-1 h-1 rounded-full bg-slate-600" />
               <span className="text-cyan-300 font-mono font-bold tracking-wider">{formattedTime} WIB</span>
-              {user && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-600" />
-                  <span className="text-emerald-400 font-medium text-xs">● Google Connected</span>
-                </>
-              )}
             </p>
           </div>
         </div>
 
-        {/* Command Palette Pill Trigger, User Dropdown & Actions */}
+        {/* Header Right Actions (Quote Insight & Settings) */}
         <div className="relative z-10 flex items-center gap-3">
-          {/* User Auth Google Dropdown */}
-          <UserDropdown
-            onOpenLoginModal={onOpenLoginModal || (() => {})}
-            onOpenSettings={onOpenSettings}
-          />
-
-          {/* Linear / Raycast Style Command Button */}
-          <button
-            onClick={onOpenCommandPalette}
-            className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] hover:border-violet-500/40 text-slate-300 hover:text-white transition-all shadow-sm cursor-pointer group"
-            title="Buka Command Palette (Ctrl+K)"
-          >
-            <Icons.Sparkles size={15} color="#A78BFA" />
-            <span className="text-xs font-medium text-slate-300 group-hover:text-white hidden sm:inline">Cari / Perintah...</span>
-            <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] font-mono text-slate-400 border border-white/10 group-hover:border-violet-500/50">
-              ⌘K
-            </kbd>
-          </button>
-
           {/* Quote Insight Pill */}
-          <div className="hidden xl:flex items-center gap-2 max-w-sm bg-white/[0.03] hover:bg-white/[0.06] transition-colors px-3 py-1.5 rounded-xl border border-white/[0.06]">
+          <div className="hidden lg:flex items-center gap-2 max-w-md bg-white/[0.03] hover:bg-white/[0.06] transition-colors px-3.5 py-2 rounded-xl border border-white/[0.06]">
             <span className="text-amber-400 shrink-0">
               <Icons.Sparkles size={14} />
             </span>
@@ -152,8 +123,8 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
 
           <button
             onClick={onOpenSettings}
-            className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/10 transition-all active:scale-95 shrink-0"
-            title="Pengaturan Supabase & Profil"
+            className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/10 transition-all active:scale-95 shrink-0 cursor-pointer"
+            title="Pengaturan Profil & Database"
           >
             <Icons.Settings size={18} />
           </button>

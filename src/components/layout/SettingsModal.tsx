@@ -2,7 +2,7 @@
 // Modal Pengaturan (Supabase, Neon Serverless PostgreSQL, & Profil Pengguna)
 // ==============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Icons } from '../ui/Icons';
@@ -33,6 +33,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Neon Config
   const [neonConfig, setNeonConfig] = useState<NeonConfig>(() => {
@@ -56,8 +57,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
 
   const [fullName, setFullName] = useState(profile.full_name);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [waterTarget, setWaterTarget] = useState(profile.daily_water_target);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert('Ukuran gambar maksimal 3MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        setAvatarUrl(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSaveNeon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,9 +96,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onUpdateProfile({
       ...profile,
       full_name: fullName.trim() || profile.full_name,
+      avatar_url: avatarUrl.trim() || profile.avatar_url,
       daily_water_target: Number(waterTarget) || 8,
     });
-    setSaveMessage('Profil berhasil diperbarui!');
+    setSaveMessage('Profil & Foto berhasil diperbarui dan disimpan ke Database!');
     setTimeout(() => setSaveMessage(null), 3000);
   };
 
@@ -312,6 +331,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       {/* 3. Profil Tab */}
       {activeTab === 'profile' && (
         <form onSubmit={handleSaveProfile} className="space-y-4">
+          {/* Avatar Change Section */}
+          <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative group">
+              <img
+                src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                alt={fullName}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-violet-500 shadow-xl shadow-violet-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-bold text-white transition-opacity cursor-pointer"
+              >
+                Ganti Foto
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-2 text-center sm:text-left">
+              <div>
+                <h4 className="text-xs font-bold text-white">Foto Profil Akun</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Foto akan otomatis tersimpan ke profil database antum.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  icon={<Icons.Sparkles size={14} />}
+                >
+                  Pilih Foto dari Galeri
+                </Button>
+
+                {avatarUrl !== profile.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl(profile.avatar_url || '')}
+                    className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                  >
+                    Reset Foto Awal
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* URL Kustom & Preset Cepat */}
+          <div className="space-y-2">
+            <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+              Atau Gunakan Tautan (URL) Foto
+            </label>
+            <input
+              type="url"
+              value={avatarUrl}
+              onChange={e => setAvatarUrl(e.target.value)}
+              placeholder="https://images.unsplash.com/..."
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-violet-500"
+            />
+          </div>
+
+          {/* Preset Avatar Cepat */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold text-slate-400">
+              Pilihan Avatar Cepat:
+            </label>
+            <div className="flex items-center gap-2">
+              {[
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+                'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
+                'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
+              ].map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setAvatarUrl(preset)}
+                  className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-transform hover:scale-110 cursor-pointer ${
+                    avatarUrl === preset ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-white/10'
+                  }`}
+                >
+                  <img src={preset} alt="preset" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
               Nama Lengkap Pengguna
@@ -342,7 +457,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="flex items-center justify-end pt-3 border-t border-white/[0.08]">
             <Button type="submit" variant="aura" size="sm">
-              Perbarui Profil
+              Simpan Profil & Foto
             </Button>
           </div>
         </form>

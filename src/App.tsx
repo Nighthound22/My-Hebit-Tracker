@@ -20,6 +20,7 @@ import { HeaderOverview } from './components/layout/HeaderOverview';
 import { SettingsModal } from './components/layout/SettingsModal';
 import { CommandPalette } from './components/ui/CommandPalette';
 import { LoginModal } from './components/auth/LoginModal';
+import { AuthGate } from './components/auth/AuthGate';
 
 // Feature Components
 import { HabitTrackerMatrix } from './components/habits/HabitTrackerMatrix';
@@ -44,6 +45,27 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [calendarSyncError, setCalendarSyncError] = useState<string | null>(null);
+
+  // Sidebar Collapsed / Dock Mode State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('aura_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('aura_sidebar_collapsed', String(next));
+      } catch {
+        // Safe storage fallback
+      }
+      return next;
+    });
+  };
 
   // Modals state
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -140,15 +162,20 @@ export default function App() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menyinkronkan Google Calendar.';
       setCalendarSyncError(msg);
-      setTimeout(() => setCalendarSyncError(null), 5000);
+      setTimeout(() => setCalendarSyncError(null), 7000);
     } finally {
       setIsSyncingCalendar(false);
     }
   };
 
+  // Jika Pengguna Belum Login dengan Akun Google Gmail, Tampilkan AuthGate Penuh Layar
+  if (!isAuthenticated) {
+    return <AuthGate />;
+  }
+
   return (
     <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col md:flex-row antialiased selection:bg-violet-500/30">
-      {/* 1. Permanent Sidebar for Desktop (> 1024px) */}
+      {/* 1. Permanent Sidebar for Desktop (> 1024px) dengan Mode Collapsed / Expand */}
       {isDesktop && (
         <Sidebar
           currentTab={currentTab}
@@ -159,19 +186,19 @@ export default function App() {
           onAddWater={addWaterCup}
           onOpenSettings={() => setIsSettingsOpen(true)}
           isCloudConnected={isCloudConnected}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
         />
       )}
 
       {/* Main Content Viewport */}
       <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto pb-24 md:pb-8 w-full">
-        {/* Daily Overview Header (PRD 3.1) with Command Palette Trigger & Google Auth */}
+        {/* Daily Overview Header (PRD 3.1) */}
         <HeaderOverview
           profile={profile}
           metrics={metrics}
           quote={dailyQuote}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-          onOpenLoginModal={() => setIsLoginModalOpen(true)}
         />
 
         {/* View Switcher based on Navigation Tab */}

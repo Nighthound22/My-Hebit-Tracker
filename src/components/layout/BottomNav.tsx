@@ -3,7 +3,7 @@
 // 5 Tab Inti dengan haptic visual micro-animation dan glowing aura indicator
 // ==============================================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Icons } from '../ui/Icons';
 import { NavigationTab } from '../../types';
 
@@ -13,6 +13,8 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab }) => {
+  const [isHidden, setIsHidden] = useState(false);
+
   const tabs = [
     { id: 'dashboard' as NavigationTab, label: 'Home', icon: Icons.Grid },
     { id: 'habits' as NavigationTab, label: 'Habits', icon: Icons.Sparkles },
@@ -21,9 +23,21 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab })
     { id: 'timer' as NavigationTab, label: 'Fokus', icon: Icons.Clock },
   ];
 
+  if (isHidden) {
+    return (
+      <button
+        onClick={() => setIsHidden(false)}
+        className="fixed bottom-3 right-3 z-40 md:hidden p-3 rounded-2xl bg-[#111424]/90 backdrop-blur-2xl border border-violet-500/40 text-cyan-400 shadow-[0_10px_30px_rgba(0,0,0,0.8)] cursor-pointer active:scale-95 transition-all animate-in fade-in"
+        title="Tampilkan Menu Navigasi"
+      >
+        <Icons.PanelLeftOpen size={18} />
+      </button>
+    );
+  }
+
   return (
-    <nav className="fixed bottom-3 left-3 right-3 z-40 md:hidden">
-      <div className="bg-[#111424]/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 shadow-[0_10px_35px_rgba(0,0,0,0.7)] flex items-center justify-around">
+    <nav className="fixed bottom-3 left-3 right-3 z-40 md:hidden transition-all duration-300">
+      <div className="bg-[#111424]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 shadow-[0_10px_35px_rgba(0,0,0,0.8)] flex items-center justify-around relative">
         {tabs.map(tab => {
           const isActive = currentTab === tab.id;
           const IconComponent = tab.icon;
@@ -54,6 +68,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab })
             </button>
           );
         })}
+
+        {/* Minimal Hide Button for Immersive Fullscreen HP */}
+        <button
+          onClick={() => setIsHidden(true)}
+          className="p-1.5 ml-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors cursor-pointer"
+          title="Sembunyikan Menu"
+        >
+          <Icons.EyeOff size={14} />
+        </button>
       </div>
     </nav>
   );

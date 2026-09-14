@@ -187,9 +187,21 @@ export const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({
       )}
 
       {calendarSyncError && (
-        <div className="mb-4 p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs flex items-center gap-2 animate-in fade-in">
-          <Icons.AlertTriangle size={15} />
-          <span>{calendarSyncError}</span>
+        <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs flex items-start gap-2.5 animate-in fade-in">
+          <Icons.AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div className="space-y-1.5">
+            <p className="font-medium leading-relaxed">{calendarSyncError}</p>
+            {calendarSyncError.includes('console.cloud.google.com') && (
+              <a
+                href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold text-xs border border-cyan-500/40 transition-colors"
+              >
+                <span>Aktifkan Google Calendar API di Google Cloud ↗</span>
+              </a>
+            )}
+          </div>
         </div>
       )}
 
