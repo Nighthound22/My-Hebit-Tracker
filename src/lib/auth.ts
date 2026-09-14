@@ -4,7 +4,7 @@
 // ==============================================================================
 
 import { AuthUser } from '../types';
-import { safeStorage } from './storage';
+import { safeStorage, LocalStorageService } from './storage';
 
 const AUTH_STORAGE_KEY = 'aura_auth_user_v1';
 const GOOGLE_CLIENT_ID_KEY = 'aura_google_client_id_v1';
@@ -114,6 +114,14 @@ class GoogleAuthService {
     this.notify();
   }
 
+  // Update profil auth user (nama, foto)
+  public updateUser(updates: Partial<AuthUser>): void {
+    if (this.user) {
+      this.user = { ...this.user, ...updates };
+      this.saveSession(this.user);
+    }
+  }
+
   // Jalan Pintas Masuk Akun Gmail Langsung (Tanpa Ribet Konfigurasi Google Cloud)
   public loginWithGmailFast(email: string, name?: string): AuthUser {
     const cleanEmail = (email || '').trim() || 'achmadali220102@gmail.com';
@@ -123,11 +131,18 @@ class GoogleAuthService {
       userName = part.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
+    // Jika user sudah memiliki foto profil tersimpan di storage lokal, gunakan foto tersebut
+    const storedProfile = LocalStorageService.getProfile();
+    const photo =
+      (storedProfile?.avatar_url && !storedProfile.avatar_url.includes('photo-1534528741775-53994a69daeb'))
+        ? storedProfile.avatar_url
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8B5CF6&color=fff&size=200&bold=true`;
+
     const authUser: AuthUser = {
       id: `gmail-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '')}`,
       email: cleanEmail,
       name: userName,
-      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8B5CF6&color=fff&size=200&bold=true`,
+      picture: photo,
       accessToken: `fast-token-${Date.now()}`,
       expiresAt: Date.now() + 365 * 24 * 3600 * 1000, // Aktif 1 tahun
     };

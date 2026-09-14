@@ -74,6 +74,12 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
 
   const scoreBadge = getScoreBadge(metrics.focusScore);
 
+  const effectiveAvatar =
+    profile.avatar_url && !profile.avatar_url.includes('photo-1534528741775-53994a69daeb')
+      ? profile.avatar_url
+      : user?.picture || profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+  const effectiveName = profile.full_name || user?.name || 'Aura User';
+
   return (
     <div className="space-y-4 mb-6">
       {/* Top Cybernetic Command Bar */}
@@ -85,8 +91,8 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
         <div className="relative z-10 flex items-center gap-4">
           <div className="relative group cursor-pointer" onClick={onOpenSettings} title="Klik untuk ubah foto & profil">
             <img
-              src={user?.picture || profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-              alt={user?.name || profile.full_name}
+              src={effectiveAvatar}
+              alt={effectiveName}
               className="w-13 h-13 rounded-2xl object-cover border-2 border-violet-500/40 shadow-lg shadow-violet-500/25 group-hover:scale-105 transition-transform"
             />
             {/* Live radar pulse on status dot */}
@@ -101,7 +107,7 @@ export const HeaderOverview: React.FC<HeaderOverviewProps> = ({
               <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
                 {getGreeting()},{' '}
                 <span className="bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
-                  {user?.name || profile.full_name}
+                  {effectiveName}
                 </span>
                 !
               </h1>

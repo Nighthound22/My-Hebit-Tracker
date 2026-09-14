@@ -50,6 +50,11 @@ export const useAuth = () => {
     }
   };
 
+  const updateUser = (updates: Partial<AuthUser>) => {
+    googleAuthService.updateUser(updates);
+    setUser(googleAuthService.getUser());
+  };
+
   const logout = () => {
     googleAuthService.logout();
     setUser(null);
@@ -62,6 +67,7 @@ export const useAuth = () => {
     error,
     loginWithGoogle,
     loginWithGmailFast,
+    updateUser,
     logout,
   };
 };

@@ -32,7 +32,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateProfile,
   onResetAllData,
 }) => {
-  const { user, logout } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'neon' | 'supabase' | 'profile'>('neon');
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.loadConfig());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,14 +66,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert('Ukuran gambar maksimal 3MB.');
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Ukuran gambar maksimal 5MB.');
         return;
       }
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
         setAvatarUrl(base64);
+        // Otomatis sinkronkan ke profil dan sesi auth agar langsung muncul di dashboard
+        onUpdateProfile({
+          ...profile,
+          avatar_url: base64,
+        });
+        if (user) {
+          updateUser({ picture: base64 });
+        }
+        setSaveMessage('✓ Foto berhasil diunggah dan disimpan!');
+        setTimeout(() => setSaveMessage(null), 3000);
       };
       reader.readAsDataURL(file);
     }
@@ -95,14 +105,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    const updatedName = fullName.trim() || profile.full_name;
+    const updatedAvatar = avatarUrl.trim() || profile.avatar_url;
+
     onUpdateProfile({
       ...profile,
-      full_name: fullName.trim() || profile.full_name,
-      avatar_url: avatarUrl.trim() || profile.avatar_url,
+      full_name: updatedName,
+      avatar_url: updatedAvatar,
       daily_water_target: Number(waterTarget) || 8,
     });
-    setSaveMessage('Profil & Foto berhasil diperbarui dan disimpan ke Database!');
-    setTimeout(() => setSaveMessage(null), 3000);
+
+    if (user) {
+      updateUser({
+        name: updatedName,
+        picture: updatedAvatar,
+      });
+    }
+
+    setSaveMessage('✓ Profil & Foto berhasil disimpan!');
+    setTimeout(() => {
+      setSaveMessage(null);
+      onClose();
+    }, 1200);
   };
 
   const handleReset = () => {
@@ -337,7 +361,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
             <div className="relative group">
               <img
-                src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                src={avatarUrl || profile.avatar_url || user?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
                 alt={fullName}
                 className="w-20 h-20 rounded-2xl object-cover border-2 border-violet-500 shadow-xl shadow-violet-500/20"
               />
@@ -379,7 +403,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {avatarUrl !== profile.avatar_url && (
                   <button
                     type="button"
-                    onClick={() => setAvatarUrl(profile.avatar_url || '')}
+                    onClick={() => {
+                      setAvatarUrl(profile.avatar_url || '');
+                      onUpdateProfile({ ...profile, avatar_url: profile.avatar_url });
+                      if (user) updateUser({ picture: profile.avatar_url });
+                    }}
                     className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
                   >
                     Reset Foto Awal
@@ -397,7 +425,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <input
               type="url"
               value={avatarUrl}
-              onChange={e => setAvatarUrl(e.target.value)}
+              onChange={e => {
+                const val = e.target.value;
+                setAvatarUrl(val);
+                if (val.startsWith('http')) {
+                  onUpdateProfile({ ...profile, avatar_url: val });
+                  if (user) updateUser({ picture: val });
+                }
+              }}
               placeholder="https://images.unsplash.com/..."
               className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-violet-500"
             />
@@ -418,7 +453,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => setAvatarUrl(preset)}
+                  onClick={() => {
+                    setAvatarUrl(preset);
+                    onUpdateProfile({ ...profile, avatar_url: preset });
+                    if (user) updateUser({ picture: preset });
+                    setSaveMessage('✓ Avatar berhasil dipilih!');
+                    setTimeout(() => setSaveMessage(null), 2000);
+                  }}
                   className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-transform hover:scale-110 cursor-pointer ${
                     avatarUrl === preset ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-white/10'
                   }`}

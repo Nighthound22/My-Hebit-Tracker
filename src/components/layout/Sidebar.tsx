@@ -33,9 +33,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse,
 }) => {
-  const { user, logout } = useAuth();
-  const displayName = user?.name || profile.full_name;
-  const displayAvatar = user?.picture || profile.avatar_url;
+  const displayName = profile.full_name || user?.name || 'Aura User';
+  const displayAvatar =
+    profile.avatar_url && !profile.avatar_url.includes('photo-1534528741775-53994a69daeb')
+      ? profile.avatar_url
+      : user?.picture || profile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
 
   const navItems = [
     { id: 'dashboard' as NavigationTab, label: 'Dashboard', icon: Icons.Grid, badge: null },
